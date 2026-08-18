@@ -1,22 +1,61 @@
+<div align="center">
+
 # romwatch
 
-A camera-based wrist and thumb hypermobility screener that runs entirely in the browser.
+**A camera-based wrist and thumb hypermobility screener that runs entirely in your browser.**
 
-romwatch watches your hand through your webcam and guides you through two short
-movements: bending your thumb toward your forearm, and bending your wrist back. The first
-is a real clinical test, the thumb-to-forearm apposition item from the Beighton score, the
+[![License: MIT](https://img.shields.io/badge/license-MIT-2f6f66)](LICENSE)
+![No frontend dependencies](https://img.shields.io/badge/frontend-zero%20dependencies-2f6f66)
+![Tests](https://img.shields.io/badge/tests-node%20%2B%20playwright-2f6f66)
+
+[Why this exists](#why-the-thumb-to-forearm-test) •
+[How it works](#how-it-works) •
+[Quick start](#quick-start) •
+[Testing](#testing) •
+[Limitations](#scope-and-limitations)
+
+</div>
+
+romwatch watches your hand through your webcam and guides you through two short movements:
+bending your thumb toward your forearm, and bending your wrist back. The first is a real
+clinical test, the thumb-to-forearm apposition item from the **Beighton score**, the
 standard nine-point exam clinicians use to screen for generalized joint hypermobility. The
-second is a supplementary wrist range-of-motion check that is not part of the formal score
+second is a supplementary wrist range-of-motion check that isn't part of the formal score
 but uses the same hand-tracking data.
 
 Every measurement runs on-device with [MediaPipe's Hand Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker).
 Nothing is uploaded. Session history lives in your browser's local storage, nowhere else.
 
-**This is a screening aid, not a diagnosis.** It is not a medical device and does not
-replace a clinician. If it flags something, the right next step is a conversation with a
-doctor, not a conclusion drawn from a webcam. See [PAPER.md](PAPER.md) for the full
-methodology, the clinical sources it draws from, and an honest account of what it can and
-cannot measure.
+> [!IMPORTANT]
+> **This is a screening aid, not a diagnosis.** It is not a medical device and does not
+> replace a clinician. If it flags something, the right next step is a conversation with a
+> doctor, not a conclusion drawn from a webcam. See [PAPER.md](PAPER.md) for the full
+> methodology, the clinical sources it draws from, and an honest account of what it can and
+> cannot measure.
+
+## Screenshots
+
+<table>
+<tr>
+<td width="50%">
+
+**Disclaimer and start screen**
+
+<img src="docs/disclaimer.png" alt="romwatch's disclaimer screen, explaining what it checks and that it is a screening aid, not a diagnosis" width="100%" />
+
+</td>
+<td width="50%">
+
+**Results screen** *(sample data, for illustration)*
+
+<img src="docs/results.png" alt="romwatch's results screen, showing one maneuver within the typical range and one flagged across multiple sessions" width="100%" />
+
+</td>
+</tr>
+</table>
+
+The live camera screen isn't pictured here since a static screenshot of your own hand mid-movement
+doesn't demo well out of context. Run it yourself, see [Quick start](#quick-start).
 
 ## Why the thumb-to-forearm test
 
@@ -24,8 +63,8 @@ Most hypermobility screening happens in a doctor's office, if it happens at all.
 condition is frequently missed for years, especially in people whose joints just read as
 "flexible" rather than as a pattern worth mentioning at a checkup. The thumb-to-forearm
 maneuver is one of the few Beighton items a single camera watching a hand can actually
-measure well, since it does not require tracking a joint the camera cannot see. That is why
-it is the anchor of this project rather than an invented substitute.
+measure well, since it doesn't require tracking a joint the camera can't see. That's why
+it's the anchor of this project rather than an invented substitute.
 
 ## How it works
 
@@ -33,7 +72,7 @@ it is the anchor of this project rather than an invented substitute.
    comfortable distance. This becomes the reference for the framing checks that follow.
 2. **Get framed.** Before each movement, the app checks that your hand is visible, not too
    close, not too far, and not clipped at the edge of the frame. The tolerance is wide on
-   purpose. There is no single correct way to sit at a webcam, so it only flags the cases
+   purpose: there's no single correct way to sit at a webcam, so it only flags the cases
    where a measurement would actually be unreliable, and says "Good, you're all set" the
    moment your current position works.
 3. **Follow the ghost.** A faint animated hand outline shows the target position for the
@@ -46,20 +85,22 @@ it is the anchor of this project rather than an invented substitute.
    "worth mentioning to a doctor" once a maneuver has come back positive across three or
    more separate sessions, not from a single reading.
 
-## Running it locally
+## Quick start
 
 Camera access requires a secure or local context, so opening `index.html` directly as a
-file will not work. Serve the folder instead:
+file won't work. Serve the folder instead:
 
-```
+```bash
+git clone https://github.com/Siguatepeque/romwatch.git
+cd romwatch
 node serve.js
 ```
 
-Then open `http://localhost:4173`.
+Then open **http://localhost:4173** in a browser with a webcam.
 
-## Tests
+## Testing
 
-```
+```bash
 node geometry.test.js   # pure geometry and scoring logic, no browser needed
 npx playwright test     # structural end-to-end check with a fake camera device
 ```
@@ -67,21 +108,32 @@ npx playwright test     # structural end-to-end check with a fake camera device
 The Playwright test drives a real Chromium instance with Chromium's fake camera device,
 which has no hand in its synthetic feed. It confirms the app loads, the camera and
 MediaPipe model initialize without errors, and the "no hand detected" framing state
-displays correctly. It cannot validate real gesture recognition accuracy, since there is no
+displays correctly. It can't validate real gesture recognition accuracy, since there's no
 hand in the test feed to recognize. That part was tested by hand, against an actual camera.
 
-## Stack
+## Tech stack
 
-Plain HTML, CSS, and JavaScript with no build step and no framework. Hand tracking comes
-from MediaPipe Tasks Vision, loaded from a CDN as an ES module. The only development
-dependency is Playwright, used for the end-to-end test above.
+- **No framework, no bundler.** Plain HTML, CSS, and JavaScript (ES modules) throughout.
+- **[MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker)** for on-device hand landmark detection, loaded from a CDN.
+- **`localStorage`** for session history. No backend, no database, no accounts.
+- **[Playwright](https://playwright.dev/)** as the only development dependency, used for the end-to-end test above.
 
-## Scope
+```
+index.html    geometry.js   draw.js         tests/e2e.spec.js
+style.css     poses.js      app.js          geometry.test.js
+```
+
+## Scope and limitations
 
 This is a v1 focused on the wrist and thumb, per its own premise, not a reimplementation of
-the full Beighton exam. It does not attempt the other seven points of the score (elbow and
+the full Beighton exam. It doesn't attempt the other seven points of the score (elbow and
 knee hyperextension, trunk flexion, the little-finger test), which need different joints and
-in some cases a full-body pose model to reach. It tracks one hand per session. There is no
+in some cases a full-body pose model to reach. It tracks one hand per session. There's no
 account system or cross-device sync; history lives in that browser's local storage only.
-See [PAPER.md](PAPER.md) for the complete list of limitations and the reasoning behind each
-design decision.
+
+See [PAPER.md](PAPER.md) for the complete methodology, the clinical literature it's grounded
+in, the full list of limitations, and how each was addressed in the design where it could be.
+
+## License
+
+[MIT](LICENSE)
