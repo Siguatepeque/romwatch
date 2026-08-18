@@ -6,8 +6,6 @@ import {
   pinkyExtensionAngleDeg,
   isThumbRepPositive,
   isPinkyRepPositive,
-  movedEnoughForThumb,
-  movedEnoughForPinky,
   sessionManeuverStatus,
   countPositiveSessions,
   recommendationTier,
@@ -32,7 +30,6 @@ const MANEUVERS = [
     },
     measure: normalizedThumbForearmDistance,
     isPositive: isThumbRepPositive,
-    movedEnough: movedEnoughForThumb,
     combineExtreme: Math.min,
   },
   {
@@ -46,7 +43,6 @@ const MANEUVERS = [
     },
     measure: pinkyExtensionAngleDeg,
     isPositive: isPinkyRepPositive,
-    movedEnough: movedEnoughForPinky,
     combineExtreme: Math.max,
   },
 ];
@@ -91,7 +87,6 @@ const state = {
   captureBadFrames: 0,
   captureTotalFrames: 0,
   captureExtreme: null,
-  captureStartValue: null,
   lastLandmarks: null,
   savedThisSession: false,
 };
@@ -203,7 +198,6 @@ function beginCapture() {
   state.captureBadFrames = 0;
   state.captureTotalFrames = 0;
   state.captureExtreme = null;
-  state.captureStartValue = null;
   goToPhase("capture");
 }
 
@@ -211,27 +205,16 @@ function finishRep() {
   const maneuver = currentManeuver();
   const badFraction = state.captureTotalFrames > 0 ? state.captureBadFrames / state.captureTotalFrames : 1;
   const trackingOk = badFraction <= QUALITY_BAD_FRACTION_LIMIT && state.captureExtreme !== null;
-  // A rep is only evidence of something if the hand actually moved a real
-  // amount during the window. Without this, holding still for the full
-  // capture (or the hand just resting near its natural position) gets
-  // measured and scored exactly like a genuine attempt.
-  const attemptedIt =
-    trackingOk &&
-    state.captureStartValue !== null &&
-    maneuver.movedEnough(state.captureStartValue, state.captureExtreme);
 
-  if (!trackingOk || !attemptedIt) {
+  if (!trackingOk) {
     state.retryCount += 1;
-    const reason = !trackingOk
-      ? "Lost tracking, let's redo that one."
-      : "Didn't see much movement there. Make sure to actually do the motion, then hold it.";
     if (state.retryCount > MAX_RETRIES_PER_REP) {
       state.reps.push({ status: "inconclusive", value: null });
       state.retryCount = 0;
       setStatus("Couldn't get a clean reading for that one. Moving on.", "warn");
       state.retryRep = false;
     } else {
-      setStatus(reason, "warn");
+      setStatus("Lost tracking, let's redo that one.", "warn");
       state.retryRep = true;
     }
     goToPhase("rep_result");
@@ -438,7 +421,6 @@ function runPhase(now) {
     if (framing !== "ok") state.captureBadFrames += 1;
     if (landmarks) {
       const value = maneuver.measure(landmarks);
-      if (state.captureStartValue === null) state.captureStartValue = value;
       state.captureExtreme =
         state.captureExtreme === null ? value : maneuver.combineExtreme(state.captureExtreme, value);
     }

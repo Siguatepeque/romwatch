@@ -136,12 +136,14 @@ stating plainly rather than overselling.
 
 - The quality gate and retry logic exist specifically because a bad reading is worse than no
   reading, so tracking failures are discarded rather than silently scored as negative.
-- A rep also has to show real movement, not just a plausible resting value, to count: the
-  measured value at the start of the capture window is compared against the extreme reached
-  during it, and a rep that didn't move enough is treated the same as a tracking failure
-  (discarded and retried), not scored as a negative reading. Without this, someone holding
-  still for the full capture window would get measured and scored exactly like someone who
-  genuinely attempted the movement, since both produce a number.
+- An earlier version also tried to verify that the person had actually moved during the
+  capture window, by comparing the value at the start of the window to the extreme reached.
+  It was removed: people naturally get into position before the countdown finishes rather
+  than waiting for the capture window to begin, which the check had no way to tell apart
+  from someone who never moved at all, and it was rejecting genuine attempts on that basis
+  far more than it was catching real non-attempts. Whether a rep reflects genuine effort is
+  currently left to the person doing the test, the same trust boundary the thumb test
+  already assumes.
 - The two-of-three-repetitions rule filters single noisy frames from being read as a joint
   finding.
 - The multi-session escalation rule (three or more separate positive sessions before the
@@ -157,10 +159,9 @@ stating plainly rather than overselling.
 
 As a portfolio project, romwatch demonstrates a full pipeline: real-time hand tracking in
 the browser, geometry derived from real clinical tests rather than an invented metric, a
-capture and quality-gating state machine that checks for genuine attempts and not just
-plausible-looking readings, and a consistency layer across sessions, all running
-client-side with no backend. As a clinical tool, it is exactly what its own disclaimer
-says: a screening aid inspired by two items of a real clinical score, not a diagnostic
-device. Turning it into something closer to clinically useful would mean, at minimum,
+capture and quality-gating state machine, and a consistency layer across sessions, all
+running client-side with no backend. As a clinical tool, it is exactly what its own
+disclaimer says: a screening aid inspired by two items of a real clinical score, not a
+diagnostic device. Turning it into something closer to clinically useful would mean, at minimum,
 validating its thresholds against a clinician-scored cohort and extending it toward the
 other seven Beighton items that a single hand-tracking camera cannot reach on its own.

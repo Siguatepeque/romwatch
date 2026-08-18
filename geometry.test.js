@@ -11,8 +11,6 @@ import {
   checkFraming,
   isThumbRepPositive,
   isPinkyRepPositive,
-  movedEnoughForThumb,
-  movedEnoughForPinky,
   sessionManeuverStatus,
   countPositiveSessions,
   recommendationTier,
@@ -105,24 +103,6 @@ test("thumb/pinky positivity thresholds are inclusive at the boundary", () => {
   assert.equal(isThumbRepPositive(0.150001), false);
   assert.equal(isPinkyRepPositive(70), true);
   assert.equal(isPinkyRepPositive(69.999), false);
-});
-
-test("movedEnoughForThumb: rejects a rep where the hand barely moved from rest", () => {
-  // Started at 0.9 (resting, far from the forearm), stayed at 0.85: not an attempt.
-  assert.equal(movedEnoughForThumb(0.9, 0.85), false);
-});
-
-test("movedEnoughForThumb: accepts a rep with a real attempt even if it fell short", () => {
-  // Started at 0.9, moved to 0.4: a genuine attempt, even though 0.4 is still negative.
-  assert.equal(movedEnoughForThumb(0.9, 0.4), true);
-});
-
-test("movedEnoughForPinky: rejects a rep where the finger barely moved from rest", () => {
-  assert.equal(movedEnoughForPinky(40, 45), false);
-});
-
-test("movedEnoughForPinky: accepts a rep with a real attempt", () => {
-  assert.equal(movedEnoughForPinky(40, 75), true);
 });
 
 test("sessionManeuverStatus: two of three positive reps is positive", () => {
