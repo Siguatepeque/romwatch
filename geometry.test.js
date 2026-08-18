@@ -9,6 +9,8 @@ import {
   checkFraming,
   isThumbRepPositive,
   isWristRepPositive,
+  movedEnoughForThumb,
+  movedEnoughForWrist,
   sessionManeuverStatus,
   countPositiveSessions,
   recommendationTier,
@@ -92,6 +94,24 @@ test("thumb/wrist positivity thresholds are inclusive at the boundary", () => {
   assert.equal(isThumbRepPositive(0.150001), false);
   assert.equal(isWristRepPositive(90), true);
   assert.equal(isWristRepPositive(89.999), false);
+});
+
+test("movedEnoughForThumb: rejects a rep where the hand barely moved from rest", () => {
+  // Started at 0.9 (resting, far from the forearm), stayed at 0.85: not an attempt.
+  assert.equal(movedEnoughForThumb(0.9, 0.85), false);
+});
+
+test("movedEnoughForThumb: accepts a rep with a real attempt even if it fell short", () => {
+  // Started at 0.9, moved to 0.4: a genuine attempt, even though 0.4 is still negative.
+  assert.equal(movedEnoughForThumb(0.9, 0.4), true);
+});
+
+test("movedEnoughForWrist: rejects a rep where the wrist barely moved from rest", () => {
+  assert.equal(movedEnoughForWrist(40, 45), false);
+});
+
+test("movedEnoughForWrist: accepts a rep with a real attempt", () => {
+  assert.equal(movedEnoughForWrist(40, 75), true);
 });
 
 test("sessionManeuverStatus: two of three positive reps is positive", () => {

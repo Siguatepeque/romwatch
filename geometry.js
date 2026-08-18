@@ -15,6 +15,22 @@ export const WRIST_EXTENSION_DEG = 90;
 // the recommendation escalates to "worth getting checked."
 export const SESSIONS_FOR_CHECKUP_TIER = 3;
 
+// A rep's extreme value alone isn't proof the person actually attempted the
+// movement: holding still gets measured too, and its resting value could
+// happen to land on either side of the positive threshold. These require the
+// measured value to have moved a meaningful amount from wherever the hand
+// started the capture window, in the direction the maneuver asks for.
+export const MIN_THUMB_MOVEMENT_NORMALIZED = 0.12;
+export const MIN_WRIST_MOVEMENT_DEG = 20;
+
+export function movedEnoughForThumb(startValue, extremeValue) {
+  return startValue - extremeValue >= MIN_THUMB_MOVEMENT_NORMALIZED;
+}
+
+export function movedEnoughForWrist(startValue, extremeValue) {
+  return extremeValue - startValue >= MIN_WRIST_MOVEMENT_DEG;
+}
+
 function sub(a, b) {
   return { x: a.x - b.x, y: a.y - b.y };
 }

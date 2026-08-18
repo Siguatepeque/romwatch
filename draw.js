@@ -36,6 +36,27 @@ export function drawSkeleton(ctx, landmarks, canvasWidth, canvasHeight, style = 
   ctx.restore();
 }
 
+// A single ring at one landmark's target position, used instead of a full
+// ghost hand: two overlapping 21-point skeletons (yours and the target's)
+// read as a confusing second hand rather than a guide. One point to reach is
+// a clearer instruction than a whole outline to match.
+export function drawTargetRing(ctx, point, canvasWidth, canvasHeight, color = "#f5c26b") {
+  const x = point.x * canvasWidth;
+  const y = point.y * canvasHeight;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.globalAlpha = 0.9;
+  ctx.beginPath();
+  ctx.arc(x, y, 16, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 export function drawGuideBox(ctx, canvasWidth, canvasHeight) {
   ctx.save();
   ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";

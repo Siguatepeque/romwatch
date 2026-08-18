@@ -6,36 +6,40 @@ import {
   wristExtensionAngleDeg,
   isThumbRepPositive,
   isWristRepPositive,
+  movedEnoughForThumb,
+  movedEnoughForWrist,
   sessionManeuverStatus,
   countPositiveSessions,
   recommendationTier,
+  THUMB_TIP,
+  MIDDLE_MCP,
 } from "./geometry.js";
 import { neutral, thumbToForearmTarget, wristExtendedTarget, interpolatePose } from "./poses.js";
-import { drawSkeleton, drawGuideBox, drawTableEdgeLine, drawCountdown } from "./draw.js";
+import { drawSkeleton, drawTargetRing, drawTableEdgeLine, drawCountdown } from "./draw.js";
 import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest";
 
 const MANEUVERS = [
   {
     key: "thumb",
     label: "Thumb-to-forearm",
-    instructions: "Bend your thumb down toward the inside of your forearm.",
+    instructions: "Bend your thumb down toward the inside of your forearm, like you're trying to touch it.",
     target: thumbToForearmTarget,
+    trackedLandmark: THUMB_TIP,
     measure: normalizedThumbForearmDistance,
     isPositive: isThumbRepPositive,
+    movedEnough: movedEnoughForThumb,
     combineExtreme: Math.min,
-    worstStart: Infinity,
-    formatValue: (v) => v.toFixed(2),
   },
   {
     key: "wrist",
     label: "Wrist extension",
-    instructions: "Rest your forearm flat on a table, wrist at the edge, then bend your hand back.",
+    instructions: "Rest your forearm flat on a table, wrist at the edge, then bend your hand back as far as it goes.",
     target: wristExtendedTarget,
+    trackedLandmark: MIDDLE_MCP,
     measure: wristExtensionAngleDeg,
     isPositive: isWristRepPositive,
+    movedEnough: movedEnoughForWrist,
     combineExtreme: Math.max,
-    worstStart: -Infinity,
-    formatValue: (v) => `${v.toFixed(0)} deg`,
     showTableGuide: true,
   },
 ];
@@ -53,6 +57,7 @@ const HISTORY_KEY = "romwatch.history";
 const video = document.getElementById("video");
 const canvas = document.getElementById("overlay");
 const ctx = canvas.getContext("2d");
+const instructionLine = document.getElementById("instruction-line");
 const statusText = document.getElementById("status-text");
 const statusDot = document.getElementById("status-dot");
 const cameraWrap = document.querySelector(".camera-wrap");
@@ -76,6 +81,7 @@ const state = {
   captureBadFrames: 0,
   captureTotalFrames: 0,
   captureExtreme: null,
+  captureStartValue: null,
   lastLandmarks: null,
   animT: 0,
   savedThisSession: false,
@@ -85,6 +91,15 @@ function setStatus(text, dotState = "neutral") {
   statusText.textContent = text;
   statusDot.className = `status-dot${dotState === "neutral" ? "" : ` status-dot--${dotState}`}`;
   cameraWrap?.classList.toggle("camera-wrap--good", dotState === "good");
+}
+
+// Separate from setStatus on purpose: this is "what to do," and it must stay
+// on screen for the whole maneuver. setStatus is "what's happening right
+// now" (framing feedback, hold/recorded messages) and changes constantly.
+// Mixing the two meant the instructions got overwritten the moment a hand
+// was detected, right when they were needed most.
+function setInstruction(text) {
+  instructionLine.textContent = text;
 }
 
 function loadHistory() {
@@ -128,7 +143,7 @@ async function start() {
   });
 
   state.phase = "calibrate";
-  setStatus("Hold your hand up naturally, palm to the camera, fingers relaxed and spread.");
+  setInstruction("Hold your hand up naturally, palm to the camera, fingers relaxed and spread.");
   requestAnimationFrame(tick);
 }
 
@@ -150,34 +165,46 @@ function goToPhase(phase) {
   state.phaseStartTime = performance.now();
 }
 
-function beginFraming(instructionPrefix) {
+function beginFraming(instructions) {
   state.framingState = null;
   state.framingStreak = 0;
+  setInstruction(instructions);
   goToPhase("frame");
-  state.frameInstructionPrefix = instructionPrefix;
 }
 
 function beginCapture() {
   state.captureBadFrames = 0;
   state.captureTotalFrames = 0;
   state.captureExtreme = null;
+  state.captureStartValue = null;
   goToPhase("capture");
 }
 
 function finishRep() {
   const maneuver = currentManeuver();
   const badFraction = state.captureTotalFrames > 0 ? state.captureBadFrames / state.captureTotalFrames : 1;
-  const qualityOk = badFraction <= QUALITY_BAD_FRACTION_LIMIT && state.captureExtreme !== null;
+  const trackingOk = badFraction <= QUALITY_BAD_FRACTION_LIMIT && state.captureExtreme !== null;
+  // A rep is only evidence of something if the hand actually moved a real
+  // amount during the window. Without this, holding still for the full
+  // capture (or the hand just resting near its natural position) gets
+  // measured and scored exactly like a genuine attempt.
+  const attemptedIt =
+    trackingOk &&
+    state.captureStartValue !== null &&
+    maneuver.movedEnough(state.captureStartValue, state.captureExtreme);
 
-  if (!qualityOk) {
+  if (!trackingOk || !attemptedIt) {
     state.retryCount += 1;
+    const reason = !trackingOk
+      ? "Lost tracking, let's redo that one."
+      : "Didn't see much movement there. Make sure to actually do the motion, then hold it.";
     if (state.retryCount > MAX_RETRIES_PER_REP) {
       state.reps.push({ status: "inconclusive", value: null });
       state.retryCount = 0;
       setStatus("Couldn't get a clean reading for that one. Moving on.", "warn");
       state.retryRep = false;
     } else {
-      setStatus("Lost tracking, let's redo that one.", "warn");
+      setStatus(reason, "warn");
       state.retryRep = true;
     }
     goToPhase("rep_result");
@@ -329,6 +356,17 @@ function tick(now) {
   runPhase(now);
 }
 
+// Draws the current maneuver's target as a single ring around the specific
+// landmark being measured, animating between the neutral and target pose.
+// Called from every phase where the user is meant to be working toward it
+// (frame, countdown, capture), not just the first one, so the guide never
+// disappears right when it matters most.
+function drawManeuverTarget(maneuver, now) {
+  state.animT = (Math.sin(now / 900) + 1) / 2;
+  const ghost = interpolatePose(neutral, maneuver.target, state.animT);
+  drawTargetRing(ctx, ghost[maneuver.trackedLandmark], canvas.width, canvas.height);
+}
+
 function runPhase(now) {
   const landmarks = state.lastLandmarks;
 
@@ -344,9 +382,7 @@ function runPhase(now) {
       return;
     }
     setStatus(
-      current === "ok"
-        ? "Holding, capturing your reference..."
-        : FRAMING_MESSAGES[current] ?? "Hold your hand up naturally, palm to the camera.",
+      current === "ok" ? "Holding, capturing your reference..." : FRAMING_MESSAGES[current] ?? "Getting ready...",
       current === "ok" ? "good" : "warn"
     );
     if (landmarks) drawSkeleton(ctx, landmarks, canvas.width, canvas.height);
@@ -356,19 +392,14 @@ function runPhase(now) {
   if (state.phase === "frame") {
     const maneuver = currentManeuver();
     if (maneuver.showTableGuide) drawTableEdgeLine(ctx, canvas.width, canvas.height);
-    state.animT = (Math.sin(now / 900) + 1) / 2;
-    const ghost = interpolatePose(neutral, maneuver.target, state.animT);
-    drawSkeleton(ctx, ghost, canvas.width, canvas.height, { color: "#f5c26b", alpha: 0.3 });
+    drawManeuverTarget(maneuver, now);
     if (landmarks) drawSkeleton(ctx, landmarks, canvas.width, canvas.height);
 
     const current = checkFraming(landmarks, canvas.width, state.refHandWidthPx);
     updateFramingStreak(current);
     if (state.framingStreak >= STABLE_FRAMES) {
-      setStatus(FRAMING_MESSAGES[current], current === "ok" ? "good" : "warn");
-      if (current === "ok") {
-        setStatus(`${maneuver.instructions} Get ready.`, "good");
-        goToPhase("countdown");
-      }
+      setStatus(current === "ok" ? "Get ready..." : FRAMING_MESSAGES[current], current === "ok" ? "good" : "warn");
+      if (current === "ok") goToPhase("countdown");
     }
     return;
   }
@@ -376,6 +407,7 @@ function runPhase(now) {
   if (state.phase === "countdown") {
     const maneuver = currentManeuver();
     if (maneuver.showTableGuide) drawTableEdgeLine(ctx, canvas.width, canvas.height);
+    drawManeuverTarget(maneuver, now);
     if (landmarks) drawSkeleton(ctx, landmarks, canvas.width, canvas.height);
     const elapsed = now - state.phaseStartTime;
     const secondsLeft = 3 - Math.floor(elapsed / 1000);
@@ -390,6 +422,7 @@ function runPhase(now) {
   if (state.phase === "capture") {
     const maneuver = currentManeuver();
     if (maneuver.showTableGuide) drawTableEdgeLine(ctx, canvas.width, canvas.height);
+    drawManeuverTarget(maneuver, now);
     if (landmarks) drawSkeleton(ctx, landmarks, canvas.width, canvas.height, { color: "#4ade80" });
 
     const framing = checkFraming(landmarks, canvas.width, state.refHandWidthPx);
@@ -397,6 +430,7 @@ function runPhase(now) {
     if (framing !== "ok") state.captureBadFrames += 1;
     if (landmarks) {
       const value = maneuver.measure(landmarks);
+      if (state.captureStartValue === null) state.captureStartValue = value;
       state.captureExtreme =
         state.captureExtreme === null ? value : maneuver.combineExtreme(state.captureExtreme, value);
     }
