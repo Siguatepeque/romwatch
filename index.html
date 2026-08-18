@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>romwatch</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <div class="wordmark">
+      <svg class="wordmark__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path
+          d="M11 20.5c0-2.8 1.6-4.6 3.4-6.6 1.5-1.7 2.1-2.9 2.1-4.4a3 3 0 0 0-5.8-1.1"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M11 20.5c0 3 2.2 5.5 5.5 5.5s5.5-2.5 5.5-5.5-1.8-4.5-3.7-6.6"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <circle cx="16.5" cy="8.3" r="1.6" fill="currentColor" />
+      </svg>
+      <h1>romwatch</h1>
+    </div>
+    <p class="tagline">A camera-based wrist range-of-motion screener</p>
+  </header>
+
+  <main>
+    <section id="disclaimer">
+      <p>
+        romwatch watches your wrist and thumb through your webcam and checks them against
+        one item of the Beighton score, a standard clinical hypermobility screening test,
+        plus a supplementary wrist range-of-motion check.
+      </p>
+      <p>
+        <strong>This is a screening aid, not a diagnosis.</strong> It is not a medical
+        device and does not replace a clinician. All video processing happens locally in
+        your browser. Nothing is uploaded anywhere.
+      </p>
+      <button id="start-btn">I understand, start</button>
+      <p class="footnote"><a href="README.md">Read more about the method</a></p>
+    </section>
+
+    <section id="stage" class="hidden">
+      <div class="camera-wrap">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="overlay"></canvas>
+      </div>
+      <p id="status-line"><span id="status-dot" class="status-dot" aria-hidden="true"></span><span id="status-text">Getting started...</span></p>
+    </section>
+
+    <section id="results" class="hidden"></section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

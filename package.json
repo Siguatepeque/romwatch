@@ -1,0 +1,12 @@
+{
+  "name": "romwatch",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node geometry.test.js",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0"
+  }
+}
