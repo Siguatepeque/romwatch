@@ -14,6 +14,10 @@ const types = {
   ".css": "text/css",
   ".json": "application/json",
   ".md": "text/markdown",
+  ".svg": "image/svg+xml",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
 };
 
 http
