@@ -4,12 +4,17 @@
 export const WRIST = 0;
 export const THUMB_TIP = 4;
 export const MIDDLE_MCP = 9;
+export const PINKY_MCP = 17;
+export const PINKY_PIP = 18;
 
 // A rep's measured value has to clear these to count as "positive" (matches a
 // clinical hypermobility sign). The thumb threshold approximates "touching":
-// landmark noise and finger thickness mean it rarely hits exactly zero.
+// landmark noise and finger thickness mean it rarely hits exactly zero. The
+// pinky threshold is a proxy for the clinical ">90 degrees from the dorsum of
+// the hand" criterion (see pinkyExtensionAngleDeg below for why it isn't the
+// same number), and like the thumb one, needs real-world calibration.
 export const THUMB_TOUCH_NORMALIZED = 0.15;
-export const WRIST_EXTENSION_DEG = 90;
+export const PINKY_EXTENSION_DEG = 70;
 
 // A maneuver needs at least this many positive sessions in the history before
 // the recommendation escalates to "worth getting checked."
@@ -21,14 +26,14 @@ export const SESSIONS_FOR_CHECKUP_TIER = 3;
 // measured value to have moved a meaningful amount from wherever the hand
 // started the capture window, in the direction the maneuver asks for.
 export const MIN_THUMB_MOVEMENT_NORMALIZED = 0.12;
-export const MIN_WRIST_MOVEMENT_DEG = 20;
+export const MIN_PINKY_MOVEMENT_DEG = 20;
 
 export function movedEnoughForThumb(startValue, extremeValue) {
   return startValue - extremeValue >= MIN_THUMB_MOVEMENT_NORMALIZED;
 }
 
-export function movedEnoughForWrist(startValue, extremeValue) {
-  return extremeValue - startValue >= MIN_WRIST_MOVEMENT_DEG;
+export function movedEnoughForPinky(startValue, extremeValue) {
+  return extremeValue - startValue >= MIN_PINKY_MOVEMENT_DEG;
 }
 
 function sub(a, b) {
@@ -75,12 +80,24 @@ export function normalizedThumbForearmDistance(landmarks) {
   return perpDistance / scale;
 }
 
-// Angle, in degrees, between the wrist -> middle MCP vector and horizontal.
-// Meaningful when the forearm is rested flat against a horizontal table edge
-// (per the on-screen guide), since the angle then reflects wrist dorsiflexion.
-export function wristExtensionAngleDeg(landmarks) {
-  const v = sub(landmarks[MIDDLE_MCP], landmarks[WRIST]);
-  const radians = Math.atan2(Math.abs(v.y), Math.abs(v.x));
+// Angle, in degrees, between the metacarpal direction at the little finger
+// (wrist -> pinky MCP) and the proximal phalanx (pinky MCP -> pinky PIP): how
+// far the finger has folded back relative to the hand itself, rather than
+// relative to the camera frame. That makes it work at any hand rotation or
+// camera angle, unlike a measurement tied to "horizontal in frame."
+//
+// This is a proxy for the clinical criterion (extension beyond 90 degrees
+// from the dorsum of the hand, normally checked by a second person passively
+// pushing the finger back), not the same reference frame: a relaxed straight
+// finger already reads as a nonzero angle here rather than 0, so the
+// threshold in PINKY_EXTENSION_DEG is tuned against this metric specifically,
+// not against the clinical 90-degree figure directly.
+export function pinkyExtensionAngleDeg(landmarks) {
+  const a = sub(landmarks[PINKY_MCP], landmarks[WRIST]);
+  const b = sub(landmarks[PINKY_PIP], landmarks[PINKY_MCP]);
+  const crossProd = a.x * b.y - a.y * b.x;
+  const dotProd = dot(a, b);
+  const radians = Math.atan2(Math.abs(crossProd), dotProd);
   return (radians * 180) / Math.PI;
 }
 
@@ -120,8 +137,8 @@ export function isThumbRepPositive(normalizedDistance) {
   return normalizedDistance <= THUMB_TOUCH_NORMALIZED;
 }
 
-export function isWristRepPositive(angleDeg) {
-  return angleDeg >= WRIST_EXTENSION_DEG;
+export function isPinkyRepPositive(angleDeg) {
+  return angleDeg >= PINKY_EXTENSION_DEG;
 }
 
 // repStatuses: array of "positive" | "negative" | "inconclusive" (one per rep,

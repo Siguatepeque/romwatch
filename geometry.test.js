@@ -4,18 +4,20 @@ import {
   WRIST,
   THUMB_TIP,
   MIDDLE_MCP,
+  PINKY_MCP,
+  PINKY_PIP,
   normalizedThumbForearmDistance,
-  wristExtensionAngleDeg,
+  pinkyExtensionAngleDeg,
   checkFraming,
   isThumbRepPositive,
-  isWristRepPositive,
+  isPinkyRepPositive,
   movedEnoughForThumb,
-  movedEnoughForWrist,
+  movedEnoughForPinky,
   sessionManeuverStatus,
   countPositiveSessions,
   recommendationTier,
 } from "./geometry.js";
-import { neutral, thumbToForearmTarget, wristExtendedTarget, interpolatePose } from "./poses.js";
+import { neutral } from "./poses.js";
 
 let passed = 0;
 function test(name, fn) {
@@ -49,16 +51,25 @@ test("normalizedThumbForearmDistance: thumb on the forearm ray is ~0", () => {
   assert.ok(d < 0.05, `expected ~0, got ${d}`);
 });
 
-test("wristExtensionAngleDeg: vertical hand reads ~90 degrees", () => {
+test("pinkyExtensionAngleDeg: finger held straight in line with the hand reads ~0 degrees", () => {
   const hand = makeHand();
-  hand[MIDDLE_MCP] = { x: 0.5, y: 0.4, z: 0 }; // straight up from wrist
-  assert.ok(Math.abs(wristExtensionAngleDeg(hand) - 90) < 1);
+  hand[PINKY_MCP] = { x: 0.6, y: 0.6, z: 0 }; // wrist -> MCP direction: (0.1, -0.2)
+  hand[PINKY_PIP] = { x: 0.65, y: 0.5, z: 0 }; // MCP -> PIP: (0.05, -0.1), same direction
+  assert.ok(Math.abs(pinkyExtensionAngleDeg(hand) - 0) < 1);
 });
 
-test("wristExtensionAngleDeg: horizontal hand reads ~0 degrees", () => {
+test("pinkyExtensionAngleDeg: finger bent perpendicular to the hand reads ~90 degrees", () => {
   const hand = makeHand();
-  hand[MIDDLE_MCP] = { x: 0.8, y: 0.8, z: 0 }; // straight right from wrist
-  assert.ok(wristExtensionAngleDeg(hand) < 1);
+  hand[PINKY_MCP] = { x: 0.6, y: 0.6, z: 0 }; // wrist -> MCP direction: (0.1, -0.2)
+  hand[PINKY_PIP] = { x: 0.8, y: 0.7, z: 0 }; // MCP -> PIP: (0.2, 0.1), perpendicular to the above
+  assert.ok(Math.abs(pinkyExtensionAngleDeg(hand) - 90) < 1);
+});
+
+test("pinkyExtensionAngleDeg: finger folded back over the hand reads ~180 degrees", () => {
+  const hand = makeHand();
+  hand[PINKY_MCP] = { x: 0.6, y: 0.6, z: 0 };
+  hand[PINKY_PIP] = { x: 0.5, y: 0.8, z: 0 }; // MCP -> PIP: (-0.1, 0.2), opposite direction
+  assert.ok(Math.abs(pinkyExtensionAngleDeg(hand) - 180) < 1);
 });
 
 test("checkFraming: no landmarks is not_detected", () => {
@@ -89,11 +100,11 @@ test("checkFraming: hand within tolerance is ok", () => {
   assert.equal(checkFraming(hand, 1000, 200), "ok");
 });
 
-test("thumb/wrist positivity thresholds are inclusive at the boundary", () => {
+test("thumb/pinky positivity thresholds are inclusive at the boundary", () => {
   assert.equal(isThumbRepPositive(0.15), true);
   assert.equal(isThumbRepPositive(0.150001), false);
-  assert.equal(isWristRepPositive(90), true);
-  assert.equal(isWristRepPositive(89.999), false);
+  assert.equal(isPinkyRepPositive(70), true);
+  assert.equal(isPinkyRepPositive(69.999), false);
 });
 
 test("movedEnoughForThumb: rejects a rep where the hand barely moved from rest", () => {
@@ -106,12 +117,12 @@ test("movedEnoughForThumb: accepts a rep with a real attempt even if it fell sho
   assert.equal(movedEnoughForThumb(0.9, 0.4), true);
 });
 
-test("movedEnoughForWrist: rejects a rep where the wrist barely moved from rest", () => {
-  assert.equal(movedEnoughForWrist(40, 45), false);
+test("movedEnoughForPinky: rejects a rep where the finger barely moved from rest", () => {
+  assert.equal(movedEnoughForPinky(40, 45), false);
 });
 
-test("movedEnoughForWrist: accepts a rep with a real attempt", () => {
-  assert.equal(movedEnoughForWrist(40, 75), true);
+test("movedEnoughForPinky: accepts a rep with a real attempt", () => {
+  assert.equal(movedEnoughForPinky(40, 75), true);
 });
 
 test("sessionManeuverStatus: two of three positive reps is positive", () => {
@@ -142,20 +153,8 @@ test("countPositiveSessions and recommendationTier escalate with history", () =>
   assert.equal(recommendationTier(count), "checked");
 });
 
-test("interpolatePose: t=0 and t=1 return the endpoints, t=0.5 is the midpoint", () => {
-  const at0 = interpolatePose(neutral, thumbToForearmTarget, 0);
-  const at1 = interpolatePose(neutral, thumbToForearmTarget, 1);
-  const atHalf = interpolatePose(neutral, thumbToForearmTarget, 0.5);
-  assert.deepEqual(at0[THUMB_TIP], neutral[THUMB_TIP]);
-  assert.deepEqual(at1[THUMB_TIP], thumbToForearmTarget[THUMB_TIP]);
-  const expectedMidX = (neutral[THUMB_TIP].x + thumbToForearmTarget[THUMB_TIP].x) / 2;
-  assert.ok(Math.abs(atHalf[THUMB_TIP].x - expectedMidX) < 1e-9);
-});
-
-test("pose data has exactly 21 landmarks per pose", () => {
-  for (const pose of [neutral, thumbToForearmTarget, wristExtendedTarget]) {
-    assert.equal(pose.length, 21);
-  }
+test("neutral pose has exactly 21 landmarks", () => {
+  assert.equal(neutral.length, 21);
 });
 
 console.log(`\n${passed} passed`);

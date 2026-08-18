@@ -13,10 +13,11 @@ generalized hypermobility spectrum disorder get diagnosed (Malfait et al., 2017)
 Most people never get screened for this at all. It is not a routine part of a checkup, and
 the condition is often missed for years, particularly in people who read as merely
 "flexible" rather than as having a joint pattern worth mentioning to a doctor. romwatch
-tries to close a small piece of that gap: a webcam can watch a hand well enough to measure
-one of the two upper-limb Beighton items directly, and can approximate a second,
-non-scored, wrist range-of-motion sign using the same landmarks. It cannot replace the
-other seven points of a real exam, and says so throughout.
+tries to close a small piece of that gap: a webcam watching a hand can measure both of the
+Beighton score's upper-limb items, the thumb-to-forearm test and the little-finger
+hyperextension test, without needing to track a joint the camera can't see. It cannot
+replace the other seven points of a real exam (elbow and knee hyperextension, trunk
+flexion), and says so throughout.
 
 ## Clinical grounding
 
@@ -56,17 +57,25 @@ are wide on purpose. There is no single correct distance or angle to sit at a we
 check only flags the extremes and confirms out loud ("Good, you're all set") once the
 current position is workable, rather than asking for one exact setup.
 
-**Guidance.** A translucent ghost skeleton, drawn with the same landmark rig used for the
-live hand, animates between a neutral pose and the maneuver's target end position on a
-loop. It is a hand-authored visual reference, not motion-capture data, and it is never read
-by the scoring logic.
+**Guidance.** An earlier version overlaid an animated ghost skeleton on the live camera feed
+as a moving target to match. In practice it did the opposite of its job: a second
+hand-shaped outline superimposed on your own tracked hand read as a confusing second hand,
+not a guide, and it drew attention away from the text instructions sitting right above it.
+It was removed. In its place, a real reference photo of the completed maneuver (cropped
+from a public-domain Wikimedia Commons image, see Credits) is shown next to the
+instructions, which stay on screen for the whole maneuver instead of being overwritten by
+live tracking feedback. The photo shows what the target position looks like; it plays no
+role in scoring.
 
 **Measurement.** For the thumb-to-forearm maneuver, the distance from the thumb-tip
 landmark to an approximated forearm line is measured and normalized by hand size. There is
 no elbow landmark available from a hand-only model, so the forearm direction is
-approximated as the ray from the wrist pointing away from the hand. For the wrist extension
-maneuver, the angle between the wrist-to-middle-knuckle vector and horizontal is measured,
-meaningful when the forearm rests flat against a table edge as instructed.
+approximated as the ray from the wrist pointing away from the hand. For the little-finger
+maneuver, the angle between the wrist-to-pinky-knuckle vector and the pinky's proximal
+phalanx is measured: how far the finger has folded back relative to the hand's own
+orientation, rather than relative to the camera frame. That makes it work at any hand
+rotation or camera angle, which the first version of this maneuver (an invented wrist-bend
+test measured against a fixed horizontal line) did not.
 
 **Scoring.** Each maneuver runs for three repetitions. A repetition is discarded and retried
 (up to twice) if tracking quality drops during capture, rather than being scored as a miss.
@@ -88,27 +97,35 @@ from smartphone images for telemedicine use. One of these studies explicitly rep
 ambiguity during finger flexion as a known accuracy limitation of MediaPipe-based
 measurement, the same limitation noted below.
 
-None of the papers found target the Beighton thumb-to-forearm maneuver specifically, and
-none build a repeated-session consistency layer on top of a single reading. That
-combination is what romwatch adds, and it is a modest difference worth stating plainly
-rather than overselling.
+None of the papers found target the Beighton thumb-to-forearm or little-finger maneuvers
+specifically, and none build a repeated-session consistency layer on top of a single
+reading. That combination is what romwatch adds, and it is a modest difference worth
+stating plainly rather than overselling.
 
 ## Limitations
 
-- **Two of nine.** romwatch measures one scored Beighton item and one supplementary,
-  non-scored sign. It cannot produce a Beighton score, and does not claim to.
+- **Two of nine.** romwatch measures two of the nine Beighton items (both upper-limb ones)
+  and cannot produce a full Beighton score. It says so, rather than implying the two it
+  covers stand in for the whole exam.
 - **No depth sensor.** A single 2D camera cannot recover true 3D joint angles as precisely
   as a goniometer or a depth camera. Landmark depth estimates from a monocular model are
   the least reliable dimension, consistent with what the related-work studies above report.
 - **No forearm tracking.** The hand-only model has no elbow landmark, so the "forearm line"
   used in the thumb-to-forearm measurement is a geometric approximation from the wrist and
   hand direction, not a tracked limb.
+- **The little-finger angle is a proxy, not the clinical reference frame.** The real test
+  measures dorsiflexion relative to the dorsum of the hand, usually with a second person
+  passively pushing the finger back. romwatch measures the angle at the joint relative to
+  the hand's own metacarpal direction instead, self-administered. The two move together
+  (more backward bend reads as a larger angle either way), but the numbers aren't
+  interchangeable, and the threshold is tuned against romwatch's own metric, not the
+  clinical 90-degree figure directly.
 - **Not validated against a clinician cohort.** The measurement thresholds are reasoned from
   the clinical literature above, not fitted to a study population scored by both romwatch
   and a clinician performing the real exam side by side.
 - **Even the clinical exam has modest reliability.** Juul-Kristensen et al. report only fair
   to poor reliability for clinician-administered Beighton scoring. A camera-based
-  approximation of one item should be read with at least that much caution, likely more.
+  approximation of these items should be read with at least that much caution, likely more.
 - **Lighting and skin tone.** Hand landmark models can lose accuracy in poor lighting or
   across skin tones underrepresented in training data. romwatch does not attempt exposure
   correction beyond flagging when no hand is detected at all.
@@ -119,6 +136,12 @@ rather than overselling.
 
 - The quality gate and retry logic exist specifically because a bad reading is worse than no
   reading, so tracking failures are discarded rather than silently scored as negative.
+- A rep also has to show real movement, not just a plausible resting value, to count: the
+  measured value at the start of the capture window is compared against the extreme reached
+  during it, and a rep that didn't move enough is treated the same as a tracking failure
+  (discarded and retried), not scored as a negative reading. Without this, someone holding
+  still for the full capture window would get measured and scored exactly like someone who
+  genuinely attempted the movement, since both produce a number.
 - The two-of-three-repetitions rule filters single noisy frames from being read as a joint
   finding.
 - The multi-session escalation rule (three or more separate positive sessions before the
@@ -133,10 +156,11 @@ rather than overselling.
 ## Conclusion
 
 As a portfolio project, romwatch demonstrates a full pipeline: real-time hand tracking in
-the browser, geometry derived from a real clinical test rather than an invented metric, a
-capture and quality-gating state machine, and a consistency layer across sessions, all
-running client-side with no backend. As a clinical tool, it is exactly what its own
-disclaimer says: a screening aid inspired by one item of a real clinical score, not a
-diagnostic device. Turning it into something closer to clinically useful would mean, at
-minimum, validating its thresholds against a clinician-scored cohort and extending it toward
-the other Beighton items that a single hand-tracking camera cannot reach on its own.
+the browser, geometry derived from real clinical tests rather than an invented metric, a
+capture and quality-gating state machine that checks for genuine attempts and not just
+plausible-looking readings, and a consistency layer across sessions, all running
+client-side with no backend. As a clinical tool, it is exactly what its own disclaimer
+says: a screening aid inspired by two items of a real clinical score, not a diagnostic
+device. Turning it into something closer to clinically useful would mean, at minimum,
+validating its thresholds against a clinician-scored cohort and extending it toward the
+other seven Beighton items that a single hand-tracking camera cannot reach on its own.

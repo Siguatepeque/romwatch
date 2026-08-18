@@ -3,21 +3,23 @@ import {
   FRAMING_MESSAGES,
   handBoundingBoxWidth,
   normalizedThumbForearmDistance,
-  wristExtensionAngleDeg,
+  pinkyExtensionAngleDeg,
   isThumbRepPositive,
-  isWristRepPositive,
+  isPinkyRepPositive,
   movedEnoughForThumb,
-  movedEnoughForWrist,
+  movedEnoughForPinky,
   sessionManeuverStatus,
   countPositiveSessions,
   recommendationTier,
-  THUMB_TIP,
-  MIDDLE_MCP,
 } from "./geometry.js";
-import { neutral, thumbToForearmTarget, wristExtendedTarget, interpolatePose } from "./poses.js";
-import { drawSkeleton, drawTargetRing, drawTableEdgeLine, drawCountdown } from "./draw.js";
+import { neutral } from "./poses.js";
+import { drawSkeleton, drawCountdown } from "./draw.js";
 import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest";
 
+// Both maneuvers use the same palm-to-camera pose as calibration, on purpose:
+// one consistent setup for the whole session, no repositioning partway
+// through. Both are real Beighton score items (the two upper-limb ones),
+// not an invented substitute.
 const MANEUVERS = [
   {
     key: "thumb",
@@ -28,24 +30,24 @@ const MANEUVERS = [
       alt: "A real photo of someone bending their thumb down to touch the inside of their forearm, the Beighton thumb-to-forearm test",
       caption: "Target: thumb touching the inner forearm. Photo via Wikimedia Commons, public domain.",
     },
-    target: thumbToForearmTarget,
-    trackedLandmark: THUMB_TIP,
     measure: normalizedThumbForearmDistance,
     isPositive: isThumbRepPositive,
     movedEnough: movedEnoughForThumb,
     combineExtreme: Math.min,
   },
   {
-    key: "wrist",
-    label: "Wrist extension",
-    instructions: "Rest your forearm flat on a table, wrist at the edge, then bend your hand back as far as it goes.",
-    target: wristExtendedTarget,
-    trackedLandmark: MIDDLE_MCP,
-    measure: wristExtensionAngleDeg,
-    isPositive: isWristRepPositive,
-    movedEnough: movedEnoughForWrist,
+    key: "pinky",
+    label: "Little finger extension",
+    instructions: "Keep your palm toward the camera, and use your other hand to push your little finger back as far as it comfortably goes.",
+    referencePhoto: {
+      src: "docs/reference-pinky-extension.jpg",
+      alt: "A real photo of someone's little finger bent back past the plane of their hand, the Beighton little finger hyperextension test",
+      caption: "Target: little finger bent back past the hand. Photo via Wikimedia Commons, public domain.",
+    },
+    measure: pinkyExtensionAngleDeg,
+    isPositive: isPinkyRepPositive,
+    movedEnough: movedEnoughForPinky,
     combineExtreme: Math.max,
-    showTableGuide: true,
   },
 ];
 
@@ -91,7 +93,6 @@ const state = {
   captureExtreme: null,
   captureStartValue: null,
   lastLandmarks: null,
-  animT: 0,
   savedThisSession: false,
 };
 
@@ -382,17 +383,6 @@ function tick(now) {
   runPhase(now);
 }
 
-// Draws the current maneuver's target as a single ring around the specific
-// landmark being measured, animating between the neutral and target pose.
-// Called from every phase where the user is meant to be working toward it
-// (frame, countdown, capture), not just the first one, so the guide never
-// disappears right when it matters most.
-function drawManeuverTarget(maneuver, now) {
-  state.animT = (Math.sin(now / 900) + 1) / 2;
-  const ghost = interpolatePose(neutral, maneuver.target, state.animT);
-  drawTargetRing(ctx, ghost[maneuver.trackedLandmark], canvas.width, canvas.height);
-}
-
 function runPhase(now) {
   const landmarks = state.lastLandmarks;
 
@@ -416,9 +406,6 @@ function runPhase(now) {
   }
 
   if (state.phase === "frame") {
-    const maneuver = currentManeuver();
-    if (maneuver.showTableGuide) drawTableEdgeLine(ctx, canvas.width, canvas.height);
-    drawManeuverTarget(maneuver, now);
     if (landmarks) drawSkeleton(ctx, landmarks, canvas.width, canvas.height);
 
     const current = checkFraming(landmarks, canvas.width, state.refHandWidthPx);
@@ -431,9 +418,6 @@ function runPhase(now) {
   }
 
   if (state.phase === "countdown") {
-    const maneuver = currentManeuver();
-    if (maneuver.showTableGuide) drawTableEdgeLine(ctx, canvas.width, canvas.height);
-    drawManeuverTarget(maneuver, now);
     if (landmarks) drawSkeleton(ctx, landmarks, canvas.width, canvas.height);
     const elapsed = now - state.phaseStartTime;
     const secondsLeft = 3 - Math.floor(elapsed / 1000);
@@ -447,8 +431,6 @@ function runPhase(now) {
 
   if (state.phase === "capture") {
     const maneuver = currentManeuver();
-    if (maneuver.showTableGuide) drawTableEdgeLine(ctx, canvas.width, canvas.height);
-    drawManeuverTarget(maneuver, now);
     if (landmarks) drawSkeleton(ctx, landmarks, canvas.width, canvas.height, { color: "#4ade80" });
 
     const framing = checkFraming(landmarks, canvas.width, state.refHandWidthPx);
