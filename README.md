@@ -75,8 +75,12 @@ it's the anchor of this project rather than an invented substitute.
    purpose: there's no single correct way to sit at a webcam, so it only flags the cases
    where a measurement would actually be unreliable, and says "Good, you're all set" the
    moment your current position works.
-3. **Follow the ghost.** A faint animated hand outline shows the target position for the
-   current movement. Match your real hand to it.
+3. **See what you're aiming for.** For the thumb-to-forearm test, a real reference photo
+   of the completed maneuver is shown next to the instructions. On the camera view itself,
+   a single ring marks where the tracked point (thumb tip, or the base of the hand for the
+   wrist test) needs to reach, animating between the resting and target position, since
+   overlaying a full second hand-shaped outline on top of your own tracked hand turned out
+   to be confusing rather than helpful.
 4. **Hold.** Each movement runs for three short repetitions. A repetition with poor
    tracking is discarded and retried rather than scored, since a bad reading is worse than
    no reading.
@@ -133,6 +137,12 @@ account system or cross-device sync; history lives in that browser's local stora
 
 See [PAPER.md](PAPER.md) for the complete methodology, the clinical literature it's grounded
 in, the full list of limitations, and how each was addressed in the design where it could be.
+
+## Credits
+
+The thumb-to-forearm reference photo is cropped from [Hypermobility Beighton Score.png](https://commons.wikimedia.org/wiki/File:Hypermobility_Beighton_Score.png)
+by Rollcloud on Wikimedia Commons, dedicated to the public domain under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
+No attribution was required, it's credited here anyway.
 
 ## License
 

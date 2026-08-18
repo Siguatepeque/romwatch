@@ -23,6 +23,11 @@ const MANEUVERS = [
     key: "thumb",
     label: "Thumb-to-forearm",
     instructions: "Bend your thumb down toward the inside of your forearm, like you're trying to touch it.",
+    referencePhoto: {
+      src: "docs/reference-thumb-forearm.jpg",
+      alt: "A real photo of someone bending their thumb down to touch the inside of their forearm, the Beighton thumb-to-forearm test",
+      caption: "Target: thumb touching the inner forearm. Photo via Wikimedia Commons, public domain.",
+    },
     target: thumbToForearmTarget,
     trackedLandmark: THUMB_TIP,
     measure: normalizedThumbForearmDistance,
@@ -58,6 +63,9 @@ const video = document.getElementById("video");
 const canvas = document.getElementById("overlay");
 const ctx = canvas.getContext("2d");
 const instructionLine = document.getElementById("instruction-line");
+const referencePhoto = document.getElementById("reference-photo");
+const referencePhotoImg = document.getElementById("reference-photo-img");
+const referencePhotoCaption = document.getElementById("reference-photo-caption");
 const statusText = document.getElementById("status-text");
 const statusDot = document.getElementById("status-dot");
 const cameraWrap = document.querySelector(".camera-wrap");
@@ -102,6 +110,22 @@ function setInstruction(text) {
   instructionLine.textContent = text;
 }
 
+// Shows a real photo of the target position where one exists (currently just
+// the thumb-to-forearm test, sourced from a public-domain Wikimedia Commons
+// photo). An actual photo of the maneuver is a much clearer "what am I aiming
+// for" reference than an abstract skeleton, so it's shown alongside, not
+// instead of, the live tracking overlay on the camera itself.
+function setReferencePhoto(maneuver) {
+  if (maneuver?.referencePhoto) {
+    referencePhotoImg.src = maneuver.referencePhoto.src;
+    referencePhotoImg.alt = maneuver.referencePhoto.alt;
+    referencePhotoCaption.textContent = maneuver.referencePhoto.caption;
+    referencePhoto.classList.remove("hidden");
+  } else {
+    referencePhoto.classList.add("hidden");
+  }
+}
+
 function loadHistory() {
   try {
     return JSON.parse(localStorage.getItem(HISTORY_KEY)) ?? [];
@@ -144,6 +168,7 @@ async function start() {
 
   state.phase = "calibrate";
   setInstruction("Hold your hand up naturally, palm to the camera, fingers relaxed and spread.");
+  setReferencePhoto(null);
   requestAnimationFrame(tick);
 }
 
@@ -169,6 +194,7 @@ function beginFraming(instructions) {
   state.framingState = null;
   state.framingStreak = 0;
   setInstruction(instructions);
+  setReferencePhoto(currentManeuver());
   goToPhase("frame");
 }
 
