@@ -32,36 +32,30 @@ function dot(a, b) {
   return a.x * b.x + a.y * b.y;
 }
 
-function normalize(v) {
-  const len = length(v) || 1;
-  return { x: v.x / len, y: v.y / len };
-}
-
 function handScale(landmarks) {
   return length(sub(landmarks[MIDDLE_MCP], landmarks[WRIST])) || 1;
 }
 
-// Distance from the thumb tip to the forearm line, normalized by hand size so
-// it holds regardless of how close the camera is. There is no elbow landmark
-// available (hand-only model), so the forearm direction is approximated as the
-// ray from the wrist pointing away from the hand (opposite of wrist -> middle
-// MCP). That is a geometric approximation for a visual/scoring proxy, not a
-// tracked limb.
+// Distance from the thumb tip to the wrist, normalized by hand size so it
+// holds regardless of how close the camera is.
+//
+// An earlier version tried to approximate the forearm's direction (there is
+// no elbow landmark available from a hand-only model) as the ray from the
+// wrist pointing away from the hand, and measured distance to that ray
+// instead of to the wrist directly. That depended on the hand's 2D direction
+// in frame correctly indicating where the forearm actually was, which real
+// testing showed breaks down badly: a genuine full thumb-to-forearm touch
+// naturally rotates the wrist away from whatever angle the hand started at,
+// so the assumed ray pointed the wrong way exactly when it mattered most.
+// Plain distance to the wrist itself doesn't depend on that assumption at
+// all, since the wrist is an actually-tracked point rather than an inferred
+// direction, at the cost of measuring "close to the wrist" rather than
+// "touching the forearm specifically." Given finger thickness and landmark
+// noise already blur that distinction, it's the more robust trade.
 export function normalizedThumbForearmDistance(landmarks) {
-  const wrist = landmarks[WRIST];
   const scale = handScale(landmarks);
-  const forearmDir = normalize({
-    x: -(landmarks[MIDDLE_MCP].x - wrist.x),
-    y: -(landmarks[MIDDLE_MCP].y - wrist.y),
-  });
-  const toThumb = sub(landmarks[THUMB_TIP], wrist);
-  const along = Math.max(0, dot(toThumb, forearmDir)); // clamp to the ray, not the full line
-  const closestPointOnRay = {
-    x: wrist.x + forearmDir.x * along,
-    y: wrist.y + forearmDir.y * along,
-  };
-  const perpDistance = length(sub(landmarks[THUMB_TIP], closestPointOnRay));
-  return perpDistance / scale;
+  const distance = length(sub(landmarks[THUMB_TIP], landmarks[WRIST]));
+  return distance / scale;
 }
 
 // Angle, in degrees, between the metacarpal direction at the little finger
@@ -109,6 +103,32 @@ export function checkFraming(landmarks, frameWidthPx, refHandWidthPx) {
   return "ok";
 }
 
+// Both maneuvers normally need a second hand to push the tracked joint into
+// position (that's how the clinical exam is administered too, just usually
+// by a clinician rather than the person's own other hand). With the model
+// watching for up to two hands, this picks out the one actually being
+// measured: whichever detected hand's wrist is closest to where the tracked
+// hand was last seen, so the assisting hand entering frame doesn't hijack
+// tracking or cause it to flicker between the two hands frame to frame.
+// Falls back to the first detected hand when there is no prior position yet
+// (session start) or only one hand is visible.
+export function pickPrimaryHand(handsLandmarks, previousWrist) {
+  if (!handsLandmarks || handsLandmarks.length === 0) return null;
+  if (handsLandmarks.length === 1 || !previousWrist) return handsLandmarks[0];
+
+  let closest = handsLandmarks[0];
+  let closestDistance = Infinity;
+  for (const landmarks of handsLandmarks) {
+    const wrist = landmarks[WRIST];
+    const distance = Math.hypot(wrist.x - previousWrist.x, wrist.y - previousWrist.y);
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closest = landmarks;
+    }
+  }
+  return closest;
+}
+
 export const FRAMING_MESSAGES = {
   not_detected: "We can't see your hand. Check your lighting or position.",
   off_center: "Keep your hand fully in frame.",
@@ -125,14 +145,15 @@ export function isPinkyRepPositive(angleDeg) {
   return angleDeg >= PINKY_EXTENSION_DEG;
 }
 
-// repStatuses: array of "positive" | "negative" | "inconclusive" (one per rep,
-// where "inconclusive" means the quality gate never passed after retries).
+// repStatuses: array of "positive" | "negative" | "inconclusive" (one or two
+// reps, where "inconclusive" means the quality gate never passed after
+// retries). A single successful demonstration is enough to score positive,
+// matching how the real Beighton exam scores a maneuver: the clinician does
+// it once per side, not several times looking for a majority.
 export function sessionManeuverStatus(repStatuses) {
-  const positiveCount = repStatuses.filter((s) => s === "positive").length;
-  const validCount = repStatuses.filter((s) => s !== "inconclusive").length;
-  if (positiveCount >= 2) return "positive";
-  if (validCount < 2) return "inconclusive";
-  return "negative";
+  if (repStatuses.some((s) => s === "positive")) return "positive";
+  if (repStatuses.some((s) => s === "negative")) return "negative";
+  return "inconclusive";
 }
 
 export function countPositiveSessions(history, maneuverKey) {

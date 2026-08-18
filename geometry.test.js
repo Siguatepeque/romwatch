@@ -9,6 +9,7 @@ import {
   normalizedThumbForearmDistance,
   pinkyExtensionAngleDeg,
   checkFraming,
+  pickPrimaryHand,
   isThumbRepPositive,
   isPinkyRepPositive,
   sessionManeuverStatus,
@@ -35,18 +36,29 @@ function makeHand() {
   return landmarks;
 }
 
-test("normalizedThumbForearmDistance: thumb far from forearm line is large", () => {
+test("normalizedThumbForearmDistance: thumb far from the wrist is large", () => {
   const hand = makeHand();
   const d = normalizedThumbForearmDistance(hand);
   assert.ok(d > 0.5, `expected a large distance, got ${d}`);
 });
 
-test("normalizedThumbForearmDistance: thumb on the forearm ray is ~0", () => {
+test("normalizedThumbForearmDistance: thumb tip right at the wrist is ~0", () => {
   const hand = makeHand();
-  // forearm ray points from wrist (0.5,0.8) away from the hand, i.e. downward (+y)
-  hand[THUMB_TIP] = { x: 0.5, y: 0.95, z: 0 };
+  hand[THUMB_TIP] = { x: 0.51, y: 0.81, z: 0 };
   const d = normalizedThumbForearmDistance(hand);
   assert.ok(d < 0.05, `expected ~0, got ${d}`);
+});
+
+test("normalizedThumbForearmDistance: doesn't depend on which way the hand is rotated", () => {
+  // Same thumb-near-wrist distance, but the rest of the hand (via middle MCP)
+  // points in a completely different direction. The old ray-based version
+  // would have measured this differently depending on hand rotation; the
+  // wrist-distance version shouldn't care.
+  const hand = makeHand();
+  hand[MIDDLE_MCP] = { x: 0.9, y: 0.9, z: 0 }; // hand rotated off to the side
+  hand[THUMB_TIP] = { x: 0.51, y: 0.81, z: 0 };
+  const d = normalizedThumbForearmDistance(hand);
+  assert.ok(d < 0.05, `expected ~0 regardless of rotation, got ${d}`);
 });
 
 test("pinkyExtensionAngleDeg: finger held straight in line with the hand reads ~0 degrees", () => {
@@ -98,6 +110,33 @@ test("checkFraming: hand within tolerance is ok", () => {
   assert.equal(checkFraming(hand, 1000, 200), "ok");
 });
 
+test("pickPrimaryHand: no hands detected returns null", () => {
+  assert.equal(pickPrimaryHand([], { x: 0.5, y: 0.5 }), null);
+  assert.equal(pickPrimaryHand(null, { x: 0.5, y: 0.5 }), null);
+});
+
+test("pickPrimaryHand: a single detected hand is returned regardless of prior position", () => {
+  const hand = makeHand();
+  assert.equal(pickPrimaryHand([hand], { x: 0, y: 0 }), hand);
+});
+
+test("pickPrimaryHand: no prior position defaults to the first detected hand", () => {
+  const handA = makeHand();
+  const handB = makeHand();
+  handB[WRIST] = { x: 0.1, y: 0.1, z: 0 };
+  assert.equal(pickPrimaryHand([handA, handB], null), handA);
+});
+
+test("pickPrimaryHand: sticks with whichever hand is closest to the last known position", () => {
+  const testHand = makeHand(); // wrist at (0.5, 0.8)
+  const assistingHand = makeHand();
+  assistingHand[WRIST] = { x: 0.05, y: 0.05, z: 0 }; // entering from a corner
+  // Even listed first, the assisting hand shouldn't hijack tracking from the
+  // hand that was actually being measured a moment ago.
+  const picked = pickPrimaryHand([assistingHand, testHand], { x: 0.5, y: 0.8 });
+  assert.equal(picked, testHand);
+});
+
 test("thumb/pinky positivity thresholds are inclusive at the boundary", () => {
   assert.equal(isThumbRepPositive(0.15), true);
   assert.equal(isThumbRepPositive(0.150001), false);
@@ -105,18 +144,19 @@ test("thumb/pinky positivity thresholds are inclusive at the boundary", () => {
   assert.equal(isPinkyRepPositive(69.999), false);
 });
 
-test("sessionManeuverStatus: two of three positive reps is positive", () => {
-  assert.equal(sessionManeuverStatus(["positive", "positive", "negative"]), "positive");
+test("sessionManeuverStatus: a single positive rep is enough", () => {
+  assert.equal(sessionManeuverStatus(["positive"]), "positive");
+  assert.equal(sessionManeuverStatus(["negative", "positive"]), "positive");
 });
 
-test("sessionManeuverStatus: fewer than two valid reps is inconclusive", () => {
-  assert.equal(sessionManeuverStatus(["inconclusive", "inconclusive", "negative"]), "inconclusive");
-  assert.equal(sessionManeuverStatus(["inconclusive", "inconclusive", "inconclusive"]), "inconclusive");
+test("sessionManeuverStatus: no valid reps is inconclusive", () => {
+  assert.equal(sessionManeuverStatus(["inconclusive"]), "inconclusive");
+  assert.equal(sessionManeuverStatus(["inconclusive", "inconclusive"]), "inconclusive");
 });
 
-test("sessionManeuverStatus: two-plus valid, fewer than two positive is negative", () => {
-  assert.equal(sessionManeuverStatus(["negative", "negative", "inconclusive"]), "negative");
-  assert.equal(sessionManeuverStatus(["negative", "positive", "negative"]), "negative");
+test("sessionManeuverStatus: a valid negative with no positive is negative", () => {
+  assert.equal(sessionManeuverStatus(["negative"]), "negative");
+  assert.equal(sessionManeuverStatus(["negative", "inconclusive"]), "negative");
 });
 
 test("countPositiveSessions and recommendationTier escalate with history", () => {

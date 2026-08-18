@@ -67,23 +67,42 @@ instructions, which stay on screen for the whole maneuver instead of being overw
 live tracking feedback. The photo shows what the target position looks like; it plays no
 role in scoring.
 
-**Measurement.** For the thumb-to-forearm maneuver, the distance from the thumb-tip
-landmark to an approximated forearm line is measured and normalized by hand size. There is
-no elbow landmark available from a hand-only model, so the forearm direction is
-approximated as the ray from the wrist pointing away from the hand. For the little-finger
-maneuver, the angle between the wrist-to-pinky-knuckle vector and the pinky's proximal
-phalanx is measured: how far the finger has folded back relative to the hand's own
-orientation, rather than relative to the camera frame. That makes it work at any hand
-rotation or camera angle, which the first version of this maneuver (an invented wrist-bend
-test measured against a fixed horizontal line) did not.
+**Tracking two hands, not one.** Nearly every Beighton maneuver is normally administered by
+a second person passively pushing the joint into position; romwatch asks the person to do
+that with their own other hand instead. An earlier version tracked only one hand, which
+meant the assisting hand entering frame could hijack tracking outright or cause it to
+flicker between the two hands frame to frame, corrupting the reading. It now tracks up to
+two hands and keeps following whichever one's wrist stays closest to where the tracked hand
+was a moment ago, so the assisting hand entering the frame doesn't take over.
 
-**Scoring.** Each maneuver runs for three repetitions. A repetition is discarded and retried
-(up to twice) if tracking quality drops during capture, rather than being scored as a miss.
-A repetition counts as positive if its extreme value clears a threshold; a session counts a
-maneuver as positive only if at least two of three valid repetitions were positive. Session
-results are stored in the browser's local storage, and the on-screen recommendation
-escalates only once a maneuver has come back positive across three or more separate
-sessions, not on a single reading.
+**Measurement.** For the thumb-to-forearm maneuver, the distance from the thumb-tip
+landmark to the wrist is measured and normalized by hand size. An earlier version tried to
+approximate the forearm's direction (there's no elbow landmark on a hand-only model) as a
+ray from the wrist, and measured distance to that ray instead of straight to the wrist. That
+depended on the hand's 2D direction in frame correctly indicating where the forearm was, and
+broke down for exactly the reason a real attempt tends to break it: a genuine full
+thumb-to-forearm touch naturally rotates the wrist away from wherever it started, taking the
+assumed ray with it. Plain distance to the wrist is angle-independent, since the wrist is an
+actually-tracked point rather than an inferred direction. For the little-finger maneuver,
+the angle between the wrist-to-pinky-knuckle vector and the pinky's proximal phalanx is
+measured: how far the finger has folded back relative to the hand's own orientation, rather
+than relative to the camera frame. Both measurements are now rotation-independent for the
+same underlying reason: neither depends on an assumption about which way the hand or arm is
+turned toward the camera, only actually-tracked landmarks relative to each other.
+
+**Scoring.** Each maneuver gets one attempt, and a second only if the first wasn't a clean
+positive (negative or a tracking failure). A repetition is discarded and retried (up to
+twice) if tracking quality drops during capture, rather than being scored as a miss. A
+single positive repetition is enough to score the maneuver positive for that session,
+matching how the real exam scores it: the clinician does the maneuver once per side, not
+several times looking for a majority. An earlier version required three repetitions with at
+least two positive, on the reasoning that requiring a plurality would filter noise; in
+practice it asked more of the person being tested (repeat attempts are exactly what's most
+tiring for someone with a hypermobile joint condition) without any real accuracy benefit,
+since a single genuine demonstration is what the clinical exam itself accepts as sufficient
+evidence. Session results are stored in the browser's local storage, and the on-screen
+recommendation escalates only once a maneuver has come back positive across three or more
+separate sessions, not on a single reading.
 
 ## Related work
 
@@ -102,6 +121,40 @@ specifically, and none build a repeated-session consistency layer on top of a si
 reading. That combination is what romwatch adds, and it is a modest difference worth
 stating plainly rather than overselling.
 
+## Real-world testing
+
+The version of this project described above is the result of one round of testing by a
+person with a clinical hEDS diagnosis, not a study, a single test session's worth of honest
+feedback. It's included here because it's the reason several design decisions above exist,
+and because a portfolio piece that only shows the polished current state hides how it got
+there.
+
+The first working version scored that same test session as within the typical range on
+both maneuvers. Three concrete problems came out of digging into why:
+
+1. **Tracking broke when the assisting hand entered frame.** Most Beighton items, including
+   both of the ones romwatch measures, are normally administered with a second person's hand
+   pushing the joint into position. Self-administered, that means the person's other hand.
+   With the model limited to one tracked hand, whichever hand it happened to lock onto each
+   frame could flip between the test hand and the assisting hand, corrupting the reading.
+   Fixed by tracking up to two hands and following the one closest to the last known
+   position (see Tracking above).
+2. **The thumb measurement assumed a hand direction that a real attempt rotates away from.**
+   The forearm-ray approximation depended on the hand's 2D direction in frame, which a
+   genuine full thumb-to-forearm motion naturally changes as the wrist turns. Fixed by
+   measuring straight-line distance to the wrist instead, which doesn't depend on hand
+   direction at all (see Measurement above).
+3. **Three repetitions asked too much.** Three attempts per maneuver, needing two positive
+   to count, was tiring to perform and not obviously better than accepting a single clean
+   demonstration, which is what the clinical exam itself does. Fixed by dropping to one
+   attempt, with a second only if the first wasn't a clean positive (see Scoring above).
+
+What this single session doesn't establish: whether the fixed version reads correctly across
+different people, hand sizes, skin tones, lighting conditions, or camera setups. One person
+finding and describing three specific failure modes is enough to fix those three failure
+modes; it is not evidence the tool is now accurate in general, and the limitations below
+still apply in full.
+
 ## Limitations
 
 - **Two of nine.** romwatch measures two of the nine Beighton items (both upper-limb ones)
@@ -110,9 +163,20 @@ stating plainly rather than overselling.
 - **No depth sensor.** A single 2D camera cannot recover true 3D joint angles as precisely
   as a goniometer or a depth camera. Landmark depth estimates from a monocular model are
   the least reliable dimension, consistent with what the related-work studies above report.
-- **No forearm tracking.** The hand-only model has no elbow landmark, so the "forearm line"
-  used in the thumb-to-forearm measurement is a geometric approximation from the wrist and
-  hand direction, not a tracked limb.
+- **No forearm tracking.** The hand-only model has no elbow landmark, so the thumb-to-forearm
+  measurement uses distance to the wrist as a stand-in for "touching the forearm." That's
+  deliberately the more robust choice given no forearm is actually tracked (see Measurement
+  above), but it is still a stand-in, not a measurement of the forearm itself.
+- **The assisting hand can occlude the joint being measured.** Tracking now follows the
+  correct hand instead of flickering between the two (see Tracking above), but if the
+  assisting hand physically covers the joint being pushed, the landmark model simply can't
+  see what it can't see. No amount of hand-selection logic fixes a joint that's hidden behind
+  another hand in the frame; that's a hard limit of a single camera, not a bug to patch.
+- **Self-administered, not passively administered.** The clinical exam has a second person
+  push the joint into position; romwatch has the person push their own joint with their own
+  other hand. Whether that changes the reading compared to a passive push (more force from
+  someone else, less proprioceptive feedback, a different resting starting point) hasn't
+  been tested against a real clinician doing it both ways on the same person.
 - **The little-finger angle is a proxy, not the clinical reference frame.** The real test
   measures dorsiflexion relative to the dorsum of the hand, usually with a second person
   passively pushing the finger back. romwatch measures the angle at the joint relative to
@@ -144,8 +208,10 @@ stating plainly rather than overselling.
   far more than it was catching real non-attempts. Whether a rep reflects genuine effort is
   currently left to the person doing the test, the same trust boundary the thumb test
   already assumes.
-- The two-of-three-repetitions rule filters single noisy frames from being read as a joint
-  finding.
+- The one-then-two-if-needed repetition rule accepts a single clean positive outright
+  (matching the clinical exam) while still giving a negative or failed attempt one more
+  chance before it's final, without asking for three or four attempts the way an earlier
+  version did.
 - The multi-session escalation rule (three or more separate positive sessions before the
   recommendation changes) exists because a single Beighton-style test, camera-based or not,
   is not something that should change anyone's behavior on the strength of one reading.

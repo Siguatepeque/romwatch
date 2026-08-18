@@ -28,9 +28,10 @@ Nothing is uploaded. Session history lives in your browser's local storage, nowh
 > [!IMPORTANT]
 > **This is a screening aid, not a diagnosis.** It is not a medical device and does not
 > replace a clinician. If it flags something, the right next step is a conversation with a
-> doctor, not a conclusion drawn from a webcam. See [PAPER.md](PAPER.md) for the full
-> methodology, the clinical sources it draws from, and an honest account of what it can and
-> cannot measure.
+> doctor, not a conclusion drawn from a webcam. See the
+> [methods and findings page](docs/paper.html) (plain-text version in [PAPER.md](PAPER.md))
+> for the full methodology, the clinical sources it draws from, real-world testing findings,
+> and an honest account of what it can and cannot measure.
 
 ## Screenshots
 
@@ -81,13 +82,16 @@ an invented substitute test.
    ghost hand on the camera feed as a moving target; in practice a second hand-shaped
    outline on top of your own tracked hand read as confusing, not helpful, so it was
    removed in favor of the photo and the plain live skeleton.
-4. **Hold.** Each movement runs for three short repetitions. A repetition with poor
-   tracking is discarded and retried rather than scored, since a bad reading is worse than
-   no reading.
-5. **Read the result.** Each maneuver needs at least two of three good repetitions past a
-   threshold to count as positive for that session. The recommendation only escalates to
-   "worth mentioning to a doctor" once a maneuver has come back positive across three or
-   more separate sessions, not from a single reading.
+4. **Hold.** Each movement gets one attempt, and a second only if the first wasn't a clean
+   positive, since most people testing this are exactly the people three or four repeat
+   attempts is most tiring for. A repetition with poor tracking is discarded and retried
+   rather than scored, since a bad reading is worse than no reading, and using your other
+   hand to help push the joint into position is expected, most of these maneuvers are
+   normally administered that way by a clinician in the first place.
+5. **Read the result.** A single successful attempt is enough to score a maneuver positive
+   for that session, matching how the real exam scores it. The recommendation only
+   escalates to "worth mentioning to a doctor" once a maneuver has come back positive
+   across three or more separate sessions, not from a single reading.
 
 ## Quick start
 
@@ -135,8 +139,10 @@ knee hyperextension, trunk flexion), which need different joints and in some cas
 full-body pose model to reach. It tracks one hand per session. There's no account system
 or cross-device sync; history lives in that browser's local storage only.
 
-See [PAPER.md](PAPER.md) for the complete methodology, the clinical literature it's grounded
-in, the full list of limitations, and how each was addressed in the design where it could be.
+See the [methods and findings page](docs/paper.html) (or [PAPER.md](PAPER.md) for the
+plain-text version) for the complete methodology, the clinical literature it's grounded in,
+what real-world testing found, the full list of limitations, and how each was addressed in
+the design where it could be.
 
 ## Credits
 

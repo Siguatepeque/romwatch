@@ -1,7 +1,9 @@
 import {
+  WRIST,
   checkFraming,
   FRAMING_MESSAGES,
   handBoundingBoxWidth,
+  pickPrimaryHand,
   normalizedThumbForearmDistance,
   pinkyExtensionAngleDeg,
   isThumbRepPositive,
@@ -22,11 +24,11 @@ const MANEUVERS = [
   {
     key: "thumb",
     label: "Thumb-to-forearm",
-    instructions: "Bend your thumb down toward the inside of your forearm, like you're trying to touch it.",
+    instructions: "Bend your thumb down toward your wrist, using your other hand to help push it if you need to.",
     referencePhoto: {
       src: "docs/reference-thumb-forearm.jpg",
       alt: "A real photo of someone bending their thumb down to touch the inside of their forearm, the Beighton thumb-to-forearm test",
-      caption: "Target: thumb touching the inner forearm. Photo via Wikimedia Commons, public domain.",
+      caption: "Target position, photographed from an angle chosen to show it clearly. Your camera angle doesn't need to match: what's measured is how close your thumb gets to your wrist, not how the photo looks.",
     },
     measure: normalizedThumbForearmDistance,
     isPositive: isThumbRepPositive,
@@ -35,11 +37,11 @@ const MANEUVERS = [
   {
     key: "pinky",
     label: "Little finger extension",
-    instructions: "Keep your palm toward the camera, and use your other hand to push your little finger back as far as it comfortably goes.",
+    instructions: "Use your other hand to push your little finger back as far as it comfortably goes. That's the normal way to do this test.",
     referencePhoto: {
       src: "docs/reference-pinky-extension.jpg",
       alt: "A real photo of someone's little finger bent back past the plane of their hand, the Beighton little finger hyperextension test",
-      caption: "Target: little finger bent back past the hand. Photo via Wikimedia Commons, public domain.",
+      caption: "Target position. It's fine if your other hand covers part of the view while it's pushing.",
     },
     measure: pinkyExtensionAngleDeg,
     isPositive: isPinkyRepPositive,
@@ -47,7 +49,12 @@ const MANEUVERS = [
   },
 ];
 
-const REPS_PER_MANEUVER = 3;
+// One attempt per maneuver, a second only if the first wasn't a clean
+// positive (negative or inconclusive). Stops the moment a positive shows up,
+// since a single successful demonstration is enough to score one, and more
+// than two tries per maneuver is a lot to ask of someone with a hypermobile
+// joint condition, which is exactly who this app is for.
+const MAX_REPS_PER_MANEUVER = 2;
 const STABLE_FRAMES = 5;
 const CALIBRATION_STABLE_FRAMES = 10;
 const CAPTURE_MS = 2500;
@@ -159,7 +166,12 @@ async function start() {
       delegate: "GPU",
     },
     runningMode: "VIDEO",
-    numHands: 1,
+    // Up to 2, not 1: most of these maneuvers need the other hand to push the
+    // tracked joint into position, and with a single-hand limit that second
+    // hand entering frame could steal tracking outright. pickPrimaryHand
+    // below sorts out which of the up-to-two detected hands is the one
+    // actually being measured.
+    numHands: 2,
   });
 
   state.phase = "calibrate";
@@ -230,7 +242,9 @@ function finishRep() {
 }
 
 function advanceRepOrManeuver() {
-  if (state.reps.length < REPS_PER_MANEUVER) {
+  const lastRep = state.reps[state.reps.length - 1];
+  const doAnotherRep = lastRep.status !== "positive" && state.reps.length < MAX_REPS_PER_MANEUVER;
+  if (doAnotherRep) {
     beginFraming(currentManeuver().instructions);
     return;
   }
@@ -355,7 +369,8 @@ function tick(now) {
 
   if (video.readyState >= 2) {
     const detection = handLandmarker.detectForVideo(video, now);
-    state.lastLandmarks = detection.landmarks?.[0] ?? null;
+    const previousWrist = state.lastLandmarks ? state.lastLandmarks[WRIST] : null;
+    state.lastLandmarks = pickPrimaryHand(detection.landmarks, previousWrist);
   }
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);

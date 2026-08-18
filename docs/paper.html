@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>romwatch: methods and findings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  :root {
+    --bg: #f6f2ea;
+    --surface: #fffdf9;
+    --surface-sunken: #efe9de;
+    --border: #e2d9c8;
+    --ink: #26221c;
+    --ink-soft: #5b5347;
+    --ink-faint: #8b8272;
+    --accent: #2f6f66;
+    --accent-strong: #204d46;
+    --accent-soft: #e2efec;
+    --warn: #93590e;
+    --warn-soft: #f5ead2;
+    --danger: #a8402b;
+    --radius: 14px;
+  }
+
+  * { box-sizing: border-box; }
+
+  ::selection { background: var(--accent); color: var(--surface); }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.65;
+  }
+
+  a { color: var(--accent-strong); text-underline-offset: 2px; }
+  a:hover { color: var(--accent); }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 56px 20px 96px;
+  }
+
+  header.site {
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .site-bar {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: 0.92rem;
+  }
+
+  .site-bar .home {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .site-bar .home svg { width: 20px; height: 20px; color: var(--accent-strong); }
+
+  .site-bar nav a { margin-left: 18px; color: var(--ink-soft); text-decoration: none; }
+  .site-bar nav a:hover { color: var(--accent-strong); }
+
+  h1 {
+    font-family: "Source Serif 4", Georgia, serif;
+    font-weight: 600;
+    font-size: 2.1rem;
+    line-height: 1.2;
+    margin: 0 0 10px;
+    letter-spacing: -0.01em;
+  }
+
+  .subtitle {
+    color: var(--ink-soft);
+    font-size: 1.08rem;
+    margin: 0 0 28px;
+    max-width: 60ch;
+  }
+
+  h2 {
+    font-family: "Source Serif 4", Georgia, serif;
+    font-weight: 600;
+    font-size: 1.45rem;
+    margin: 48px 0 16px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+
+  h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 24px 0 8px;
+  }
+
+  p { margin: 0 0 16px; max-width: 68ch; }
+  ul, ol { margin: 0 0 16px; padding-left: 1.3em; max-width: 66ch; }
+  li { margin-bottom: 8px; }
+
+  code {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    background: var(--surface-sunken);
+    padding: 0.1em 0.4em;
+    border-radius: 5px;
+    font-size: 0.92em;
+  }
+
+  .callout {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 28px;
+    margin: 0 0 36px;
+  }
+
+  .callout h2 { margin-top: 0; padding-top: 0; border-top: none; }
+
+  .callout ul { margin-bottom: 0; }
+  .callout li { margin-bottom: 10px; }
+
+  .disclaimer {
+    background: var(--warn-soft);
+    border: 1px solid #e6d3a3;
+    border-radius: var(--radius);
+    padding: 18px 22px;
+    margin: 0 0 32px;
+    color: #5c3d09;
+    font-size: 0.95rem;
+  }
+
+  .disclaimer strong { color: #40290a; }
+
+  nav.toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 26px;
+    margin: 0 0 40px;
+  }
+
+  nav.toc p.label {
+    margin: 0 0 10px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+    color: var(--ink-faint);
+  }
+
+  nav.toc ol {
+    margin: 0;
+    padding-left: 1.3em;
+    columns: 2;
+    column-gap: 24px;
+  }
+
+  nav.toc li { margin-bottom: 6px; break-inside: avoid; }
+  nav.toc a { text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+
+  .table-scroll {
+    overflow-x: auto;
+    margin: 0 0 20px;
+  }
+
+  table {
+    width: 100%;
+    min-width: 560px;
+    border-collapse: collapse;
+    font-size: 0.94rem;
+  }
+
+  caption {
+    text-align: left;
+    font-size: 0.85rem;
+    color: var(--ink-faint);
+    margin-bottom: 8px;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  th {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-faint);
+    font-weight: 600;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  .tag {
+    display: inline-block;
+    font-size: 0.76rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    white-space: nowrap;
+  }
+
+  .tag-fixed { background: var(--accent-soft); color: var(--accent-strong); }
+
+  .limits { list-style: none; padding: 0; margin: 0; }
+  .limits li {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .limits li:first-child { padding-top: 0; }
+  .limits li:last-child { border-bottom: none; padding-bottom: 0; }
+  .limits strong { display: block; margin-bottom: 4px; color: var(--ink); }
+
+  .pipeline-figure { margin: 0 0 32px; }
+  .pipeline-scroll { overflow-x: auto; }
+  .pipeline-diagram { width: 100%; min-width: 640px; height: auto; display: block; }
+  .pipeline-caption {
+    font-size: 0.85rem;
+    color: var(--ink-faint);
+    margin-top: 10px;
+  }
+
+  footer.site {
+    border-top: 1px solid var(--border);
+    margin-top: 24px;
+  }
+
+  .footer-wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 28px 20px 48px;
+    font-size: 0.88rem;
+    color: var(--ink-faint);
+  }
+
+  .footer-wrap a { color: var(--ink-soft); }
+
+  @media (max-width: 560px) {
+    .wrap { padding: 40px 16px 72px; }
+    h1 { font-size: 1.7rem; }
+    nav.toc ol { columns: 1; }
+    .site-bar { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .site-bar nav a { margin-left: 0; margin-right: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="site-bar">
+    <a class="home" href="../index.html">
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path d="M11 20.5c0-2.8 1.6-4.6 3.4-6.6 1.5-1.7 2.1-2.9 2.1-4.4a3 3 0 0 0-5.8-1.1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M11 20.5c0 3 2.2 5.5 5.5 5.5s5.5-2.5 5.5-5.5-1.8-4.5-3.7-6.6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <circle cx="16.5" cy="8.3" r="1.6" fill="currentColor" />
+      </svg>
+      romwatch
+    </a>
+    <nav>
+      <a href="../index.html">Try it</a>
+      <a href="https://github.com/Siguatepeque/romwatch">GitHub</a>
+      <a href="../README.md">README</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <h1>Methods and findings</h1>
+  <p class="subtitle">Research notes &middot; a camera-based screener for two Beighton hypermobility tests</p>
+
+  <p>
+    Generalized joint hypermobility is usually screened with the Beighton score, a nine-point
+    clinical exam a clinician performs by hand. Two of those nine points come from the hand
+    alone: whether the little finger can be passively extended past 90 degrees, and whether
+    the thumb can be bent down to touch the forearm. romwatch measures both of them through
+    a webcam, entirely on-device, and says plainly what it can't do.
+  </p>
+
+  <div class="disclaimer">
+    <strong>This is a screening aid, not a diagnosis.</strong> It is not a medical device and
+    does not replace a clinician. See <a href="#limitations">Limitations</a> before drawing
+    any conclusion from it.
+  </div>
+
+  <div class="callout">
+    <h2>Key facts</h2>
+    <ul>
+      <li>Measures <strong>2 of the 9</strong> Beighton score items, the two that involve only the hand: thumb-to-forearm apposition and little-finger hyperextension.</li>
+      <li>Runs <strong>entirely client-side</strong>: on-device MediaPipe hand tracking, nothing uploaded, no backend.</li>
+      <li>Grounded in <a href="#clinical-grounding">five real clinical papers</a>, not an invented metric.</li>
+      <li>One round of real-world testing by a person with a clinical hEDS diagnosis <a href="#real-world-testing">surfaced three concrete bugs</a>, all since fixed.</li>
+      <li>Scores a maneuver positive from a <strong>single clean demonstration</strong>, matching how the clinical exam itself scores it.</li>
+    </ul>
+  </div>
+
+  <nav class="toc" aria-label="Table of contents">
+    <p class="label">Contents</p>
+    <ol>
+      <li><a href="#motivation">Motivation</a></li>
+      <li><a href="#clinical-grounding">Clinical grounding</a></li>
+      <li><a href="#method">Method</a></li>
+      <li><a href="#related-work">Related work</a></li>
+      <li><a href="#real-world-testing">Real-world testing</a></li>
+      <li><a href="#limitations">Limitations</a></li>
+      <li><a href="#design-responses">Design responses</a></li>
+      <li><a href="#conclusion">Conclusion</a></li>
+    </ol>
+  </nav>
+
+  <section id="motivation">
+    <h2>Motivation</h2>
+    <p>
+      A Beighton score at or above a cutoff, combined with other criteria, is part of how
+      hypermobile Ehlers-Danlos syndrome and generalized hypermobility spectrum disorder get
+      diagnosed (Malfait et al., 2017). Most people never get screened for this at all: it
+      isn't a routine part of a checkup, and the condition is often missed for years,
+      particularly in people who read as merely "flexible" rather than as having a joint
+      pattern worth mentioning to a doctor.
+    </p>
+    <p>
+      romwatch tries to close a small piece of that gap. A webcam watching a hand can measure
+      both of the Beighton score's upper-limb items without needing to track a joint the
+      camera can't see. It cannot replace the other seven points of a real exam (elbow and
+      knee hyperextension, trunk flexion), and says so throughout, including here.
+    </p>
+  </section>
+
+  <section id="clinical-grounding">
+    <h2>Clinical grounding</h2>
+    <div class="table-scroll">
+    <table>
+      <caption>The literature romwatch's maneuvers and thresholds are reasoned from.</caption>
+      <thead>
+        <tr><th>Source</th><th>Year</th><th>What it establishes</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Beighton, Solomon &amp; Soskolne, <em>Annals of the Rheumatic Diseases</em></td>
+          <td>1973</td>
+          <td>The original nine-point scoring system. Both of romwatch's maneuvers are drawn directly from it.</td>
+        </tr>
+        <tr>
+          <td>Grahame, Bird &amp; Child (Brighton criteria), <em>J. Rheumatology</em></td>
+          <td>2000</td>
+          <td>Ties the raw Beighton number to an actual diagnostic framework.</td>
+        </tr>
+        <tr>
+          <td>Malfait et al., <em>Am. J. Med. Genet. C</em></td>
+          <td>2017</td>
+          <td>Current hEDS / G-HSD diagnostic criteria; requires an age-adjusted Beighton cutoff as one of several factors, not a diagnosis alone.</td>
+        </tr>
+        <tr>
+          <td>Malek, Reinhold &amp; Pearce, <em>Rheumatology International</em></td>
+          <td>2021</td>
+          <td>The score is upper-limb-weighted and shouldn't be used alone to rule generalized hypermobility in or out. Anchors most of the <a href="#limitations">limitations</a> below.</td>
+        </tr>
+        <tr>
+          <td>Juul-Kristensen, Rombaut et al., <em>Am. J. Med. Genet. C</em></td>
+          <td>2017</td>
+          <td>Even clinician-administered Beighton scoring has only fair-to-poor reliability, a ceiling any camera-based version inherits.</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section id="method">
+    <h2>Method</h2>
+
+    <figure class="pipeline-figure">
+      <div class="pipeline-scroll">
+      <svg class="pipeline-diagram" viewBox="0 0 1000 190" role="img" aria-labelledby="pipelineTitle pipelineDesc">
+        <title id="pipelineTitle">The per-maneuver capture pipeline</title>
+        <desc id="pipelineDesc">Five stages in order: Calibrate, Frame, Countdown, Capture, Score. From Score, a dashed arrow loops back to Frame for a second attempt when the first wasn't a clean positive; a solid arrow continues on to the next maneuver or to Results.</desc>
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--accent-strong)" />
+          </marker>
+          <marker id="arrowMuted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--ink-faint)" />
+          </marker>
+        </defs>
+
+        <!-- connecting arrows between the 5 boxes -->
+        <line x1="150" y1="70" x2="186" y2="70" stroke="var(--accent-strong)" stroke-width="2" marker-end="url(#arrow)" />
+        <line x1="330" y1="70" x2="366" y2="70" stroke="var(--accent-strong)" stroke-width="2" marker-end="url(#arrow)" />
+        <line x1="510" y1="70" x2="546" y2="70" stroke="var(--accent-strong)" stroke-width="2" marker-end="url(#arrow)" />
+        <line x1="690" y1="70" x2="726" y2="70" stroke="var(--accent-strong)" stroke-width="2" marker-end="url(#arrow)" />
+
+        <!-- loop-back: Score -> Frame, second attempt -->
+        <path d="M 796 100 C 796 150, 270 150, 270 102" fill="none" stroke="var(--ink-faint)" stroke-width="2" stroke-dasharray="5 5" marker-end="url(#arrowMuted)" />
+        <text x="533" y="172" text-anchor="middle" font-size="13" fill="var(--ink-faint)">second attempt, only if the first wasn't a clean positive</text>
+
+        <!-- forward: Score -> next maneuver / results -->
+        <line x1="810" y1="40" x2="840" y2="15" stroke="var(--accent-strong)" stroke-width="2" marker-end="url(#arrow)" />
+        <text x="990" y="13" text-anchor="end" font-size="12" fill="var(--ink-soft)">next maneuver, or Results</text>
+
+        <!-- boxes -->
+        <g font-family="Public Sans, sans-serif">
+          <g>
+            <rect x="10" y="40" width="140" height="60" rx="10" fill="var(--surface)" stroke="var(--border)" />
+            <text x="80" y="65" text-anchor="middle" font-size="14" font-weight="700" fill="var(--ink)">Calibrate</text>
+            <text x="80" y="83" text-anchor="middle" font-size="11" fill="var(--ink-faint)">once, session start</text>
+          </g>
+          <g>
+            <rect x="190" y="40" width="140" height="60" rx="10" fill="var(--surface)" stroke="var(--border)" />
+            <text x="260" y="65" text-anchor="middle" font-size="14" font-weight="700" fill="var(--ink)">Frame</text>
+            <text x="260" y="83" text-anchor="middle" font-size="11" fill="var(--ink-faint)">wide tolerance check</text>
+          </g>
+          <g>
+            <rect x="370" y="40" width="140" height="60" rx="10" fill="var(--surface)" stroke="var(--border)" />
+            <text x="440" y="65" text-anchor="middle" font-size="14" font-weight="700" fill="var(--ink)">Countdown</text>
+            <text x="440" y="83" text-anchor="middle" font-size="11" fill="var(--ink-faint)">3, 2, 1</text>
+          </g>
+          <g>
+            <rect x="550" y="40" width="140" height="60" rx="10" fill="var(--surface)" stroke="var(--border)" />
+            <text x="620" y="65" text-anchor="middle" font-size="14" font-weight="700" fill="var(--ink)">Capture</text>
+            <text x="620" y="83" text-anchor="middle" font-size="11" fill="var(--ink-faint)">~2.5s, track extreme</text>
+          </g>
+          <g>
+            <rect x="730" y="40" width="140" height="60" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" />
+            <text x="800" y="65" text-anchor="middle" font-size="14" font-weight="700" fill="var(--accent-strong)">Score</text>
+            <text x="800" y="83" text-anchor="middle" font-size="11" fill="var(--accent-strong)">positive / negative</text>
+          </g>
+        </g>
+      </svg>
+      </div>
+      <p class="pipeline-caption">The state machine every attempt runs through, per maneuver.</p>
+    </figure>
+
+    <h3>Calibration</h3>
+    <p>
+      Before any maneuver, the user holds a hand up naturally in front of the camera. Once
+      MediaPipe's Hand Landmarker detects a stable hand for about half a second, the app
+      records the hand's bounding-box width in pixels as a personal reference size, used to
+      normalize distance measurements and to judge camera distance for the rest of the
+      session.
+    </p>
+
+    <h3>Framing</h3>
+    <p>
+      Camera position is checked continuously, but only to catch cases where a measurement
+      would be unreliable: no hand visible, the hand too small or too large relative to the
+      calibrated reference, or the wrist near the edge of the frame. The tolerance bands are
+      wide on purpose. There's no single correct distance or angle to sit at a webcam, so the
+      check only flags the extremes and confirms out loud ("Good, you're all set") once the
+      current position is workable, rather than asking for one exact setup.
+    </p>
+
+    <h3>Guidance</h3>
+    <p>
+      An earlier version overlaid an animated ghost skeleton on the live camera feed as a
+      moving target to match. In practice it did the opposite of its job: a second
+      hand-shaped outline superimposed on the user's own tracked hand read as a confusing
+      second hand, not a guide, and drew attention away from the text instructions sitting
+      right above it. It was removed. In its place, a real reference photo of the completed
+      maneuver (cropped from a public-domain Wikimedia Commons image, see the app's
+      <a href="../README.md#credits">Credits</a>) is shown next to instructions that stay on
+      screen for the whole maneuver instead of being overwritten by live tracking feedback.
+    </p>
+
+    <h3>Tracking two hands, not one</h3>
+    <p>
+      Nearly every Beighton maneuver is normally administered by a second person passively
+      pushing the joint into position; romwatch asks the person to do that with their own
+      other hand instead. An earlier version tracked only one hand, which meant the assisting
+      hand entering frame could hijack tracking outright or flicker between the two hands
+      frame to frame, corrupting the reading. It now tracks up to two hands and keeps
+      following whichever one's wrist stays closest to where the tracked hand was a moment
+      ago, so the assisting hand entering the frame doesn't take over.
+    </p>
+
+    <h3>Measurement</h3>
+    <p>
+      For the thumb-to-forearm maneuver, the distance from the thumb-tip landmark to the
+      wrist is measured and normalized by hand size. An earlier version tried to approximate
+      the forearm's direction (there's no elbow landmark on a hand-only model) as a ray from
+      the wrist, and measured distance to that ray instead of straight to the wrist. That
+      depended on the hand's 2D direction in frame correctly indicating where the forearm
+      was, and broke down for exactly the reason a real attempt tends to break it: a genuine
+      full thumb-to-forearm touch naturally rotates the wrist away from wherever it started,
+      taking the assumed ray with it. Plain distance to the wrist is angle-independent, since
+      the wrist is an actually-tracked point rather than an inferred direction.
+    </p>
+    <p>
+      For the little-finger maneuver, the angle between the wrist-to-pinky-knuckle vector and
+      the pinky's proximal phalanx is measured: how far the finger has folded back relative
+      to the hand's own orientation, rather than relative to the camera frame. Both
+      measurements are now rotation-independent for the same reason: neither depends on an
+      assumption about which way the hand or arm is turned toward the camera, only
+      actually-tracked landmarks relative to each other.
+    </p>
+
+    <h3>Scoring</h3>
+    <p>
+      Each maneuver gets one attempt, and a second only if the first wasn't a clean positive.
+      A repetition is discarded and retried (up to twice) if tracking quality drops during
+      capture, rather than being scored as a miss. A single positive repetition is enough to
+      score the maneuver positive for that session, matching how the real exam scores it: the
+      clinician does the maneuver once per side, not several times looking for a majority.
+      Session results are stored in the browser's local storage, and the on-screen
+      recommendation escalates only once a maneuver has come back positive across three or
+      more separate sessions, not on a single reading.
+    </p>
+  </section>
+
+  <section id="related-work">
+    <h2>Related work</h2>
+    <p>
+      Camera-based hand range-of-motion measurement is an active research area, and romwatch
+      isn't the first attempt at it. Several recent studies validate MediaPipe Hands
+      specifically against manual goniometry for hand and thumb range of motion, including a
+      2025 study in <em>Sensors</em> that extracted clinical thumb ROM parameters (IP, MP, and
+      CMC joint angles) from a single camera, and a 2023 study in <em>PLOS ONE</em> using a
+      webcam-based machine learning approach for three-dimensional ROM evaluation. A 2023
+      paper describes automatic hand ROM measurement from smartphone images for telemedicine
+      use. One of these studies explicitly reports depth ambiguity during finger flexion as a
+      known accuracy limitation of MediaPipe-based measurement, the same limitation noted
+      under <a href="#limitations">Limitations</a>.
+    </p>
+    <p>
+      None of the papers found target the Beighton thumb-to-forearm or little-finger
+      maneuvers specifically, and none build a repeated-session consistency layer on top of a
+      single reading. That combination is what romwatch adds, a modest difference worth
+      stating plainly rather than overselling.
+    </p>
+  </section>
+
+  <section id="real-world-testing">
+    <h2>Real-world testing</h2>
+    <p>
+      The version described above is the result of one round of testing by a person with a
+      clinical hEDS diagnosis, not a study, a single test session's worth of honest feedback.
+      It's included here because it's the reason several design decisions above exist, and
+      because a portfolio piece that only shows the polished current state hides how it got
+      there.
+    </p>
+    <p>
+      The first working version scored that same test session as within the typical range on
+      both maneuvers. Three concrete problems came out of digging into why:
+    </p>
+
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>Problem</th><th>Root cause</th><th>Fix</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Tracking broke when the assisting hand entered frame</td>
+          <td>Beighton maneuvers are normally administered with a second hand pushing the
+            joint into position. With tracking limited to one hand, whichever hand the model
+            locked onto could flip between the test hand and the assisting hand frame to
+            frame.</td>
+          <td><span class="tag tag-fixed">fixed</span> Track up to two hands; follow whichever
+            one stays closest to the last known position.</td>
+        </tr>
+        <tr>
+          <td>The thumb measurement assumed a hand direction a real attempt rotates away from</td>
+          <td>The forearm-ray approximation depended on the hand's 2D direction in frame,
+            which a genuine full thumb-to-forearm motion changes as the wrist turns.</td>
+          <td><span class="tag tag-fixed">fixed</span> Measure straight-line distance to the
+            wrist instead, which doesn't depend on hand direction.</td>
+        </tr>
+        <tr>
+          <td>Three repetitions asked too much</td>
+          <td>Three attempts per maneuver, needing two positive, was tiring to perform and no
+            more accurate than accepting one clean demonstration, which is what the clinical
+            exam itself does.</td>
+          <td><span class="tag tag-fixed">fixed</span> One attempt, a second only if the first
+            wasn't a clean positive.</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <p>
+      What this single session doesn't establish: whether the fixed version reads correctly
+      across different people, hand sizes, skin tones, lighting conditions, or camera setups.
+      One person finding and describing three specific failure modes is enough to fix those
+      three failure modes; it isn't evidence the tool is now accurate in general, and the
+      limitations below still apply in full.
+    </p>
+  </section>
+
+  <section id="limitations">
+    <h2>Limitations</h2>
+    <ul class="limits">
+      <li><strong>Two of nine.</strong> romwatch measures two of the nine Beighton items and cannot produce a full Beighton score. It says so, rather than implying the two it covers stand in for the whole exam.</li>
+      <li><strong>No depth sensor.</strong> A single 2D camera can't recover true 3D joint angles as precisely as a goniometer or a depth camera. Landmark depth estimates from a monocular model are the least reliable dimension.</li>
+      <li><strong>No forearm tracking.</strong> The hand-only model has no elbow landmark, so the thumb-to-forearm measurement uses distance to the wrist as a stand-in for "touching the forearm," a deliberately more robust choice, but still a stand-in.</li>
+      <li><strong>The assisting hand can occlude the joint being measured.</strong> Tracking now follows the correct hand, but if the assisting hand physically covers the joint being pushed, the landmark model simply can't see what it can't see. That's a hard limit of a single camera, not a bug to patch.</li>
+      <li><strong>Self-administered, not passively administered.</strong> The clinical exam has a second person push the joint into position; romwatch has the person push their own joint with their own other hand. Whether that changes the reading hasn't been tested against a clinician doing it both ways on the same person.</li>
+      <li><strong>The little-finger angle is a proxy, not the clinical reference frame.</strong> The real test measures dorsiflexion relative to the dorsum of the hand. romwatch measures the joint angle relative to the hand's own metacarpal direction instead. The two move together, but the numbers aren't interchangeable.</li>
+      <li><strong>Not validated against a clinician cohort.</strong> Thresholds are reasoned from the clinical literature above, not fitted to a population scored by both romwatch and a clinician side by side.</li>
+      <li><strong>Even the clinical exam has modest reliability.</strong> Juul-Kristensen et al. report only fair-to-poor reliability for clinician-administered Beighton scoring, a ceiling any camera-based version inherits.</li>
+      <li><strong>Lighting and skin tone.</strong> Hand landmark models can lose accuracy in poor lighting or across skin tones underrepresented in training data.</li>
+      <li><strong>One hand, one sitting.</strong> The current version tracks a single hand per session and doesn't prompt for both sides as the real exam would.</li>
+    </ul>
+  </section>
+
+  <section id="design-responses">
+    <h2>Design responses</h2>
+    <ul>
+      <li>The quality gate and retry logic exist because a bad reading is worse than no reading, so tracking failures are discarded rather than silently scored as negative.</li>
+      <li>An earlier version also tried to verify the person had actually moved during the capture window. It was removed: people naturally get into position before the countdown finishes, which the check had no way to tell apart from someone who never moved at all, and it rejected genuine attempts far more than it caught real non-attempts.</li>
+      <li>The one-then-two-if-needed repetition rule accepts a single clean positive outright while still giving a negative or failed attempt one more chance, without asking for three or four attempts.</li>
+      <li>The multi-session escalation rule exists because a single Beighton-style test, camera-based or not, shouldn't change anyone's behavior on the strength of one reading.</li>
+      <li>The framing tolerance is deliberately wide: a measurement that only works from one exact camera position isn't one that gets used consistently.</li>
+      <li>What this design can't fix: the fundamental gap between a single 2D camera and a clinician's hands-on exam. No amount of retry logic recovers a dimension the camera never captured.</li>
+    </ul>
+  </section>
+
+  <section id="conclusion">
+    <h2>Conclusion</h2>
+    <p>
+      As a portfolio project, romwatch demonstrates a full pipeline: real-time hand tracking
+      in the browser, geometry derived from real clinical tests rather than an invented
+      metric, a capture and quality-gating state machine, and a consistency layer across
+      sessions, all running client-side with no backend. As a clinical tool, it's exactly
+      what its own disclaimer says: a screening aid inspired by two items of a real clinical
+      score, not a diagnostic device. Turning it into something closer to clinically useful
+      would mean, at minimum, validating its thresholds against a clinician-scored cohort and
+      extending it toward the other seven Beighton items that a single hand-tracking camera
+      can't reach on its own.
+    </p>
+  </section>
+</div>
+
+<footer class="site">
+  <div class="footer-wrap">
+    <p>
+      <a href="https://github.com/Siguatepeque/romwatch">github.com/Siguatepeque/romwatch</a>
+      &middot; <a href="../LICENSE">MIT licensed</a>
+      &middot; <a href="../README.md">README</a>
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>
