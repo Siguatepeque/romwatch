@@ -145,7 +145,7 @@ hand in the test feed to recognize. That part was tested by hand, against an act
 
 - **No framework, no bundler.** Plain HTML, CSS, and JavaScript (ES modules) throughout.
 - **[MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker)** for on-device hand landmark detection, loaded from a CDN.
-- **`localStorage`** for session history. No backend, no database, no accounts.
+- **`localStorage`** for session history, so there's no backend or account system.
 - **[Playwright](https://playwright.dev/)** as the only development dependency, used for the end-to-end test above.
 
 ```
