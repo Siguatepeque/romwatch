@@ -46,6 +46,11 @@
         your thumb to your forearm, and bending your little finger back.
       </p>
       <p>
+        Both are <strong>passive</strong> tests. A clinician would push the joint into
+        position for you, so here you use your own other hand to do it. Having both hands in
+        frame is expected, and the app keeps measuring the hand you started with.
+      </p>
+      <p>
         <strong>This is a screening aid, not a diagnosis.</strong> It is not a medical
         device and does not replace a clinician. All video processing happens locally in
         your browser. Nothing is uploaded anywhere.
@@ -65,6 +70,10 @@
         <canvas id="overlay"></canvas>
       </div>
       <p id="status-line"><span id="status-dot" class="status-dot" aria-hidden="true"></span><span id="status-text"></span></p>
+      <p id="readout" class="readout hidden" aria-live="polite">
+        <span id="readout-text"></span>
+        <span id="readout-detail"></span>
+      </p>
     </section>
 
     <section id="results" class="hidden"></section>

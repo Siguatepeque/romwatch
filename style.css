@@ -263,6 +263,53 @@ button:active {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
+/* The live measurement, always on screen while measuring. Deliberately plain
+   and quiet: it's reference information you read when something looks wrong,
+   not a second status line competing with the instruction. */
+.readout {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  text-align: center;
+}
+
+#readout-text {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+#readout-detail {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-faint);
+}
+
+.readout--met {
+  background: var(--accent-soft);
+  border-color: transparent;
+}
+
+.readout--met #readout-text {
+  color: var(--accent-strong);
+}
+
+.readout--met #readout-detail {
+  color: var(--accent);
+}
+
+.measured {
+  margin: 0 0 var(--space-2);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-faint);
+}
+
 #results h2 {
   font-family: "Source Serif 4", Georgia, serif;
   font-weight: 500;

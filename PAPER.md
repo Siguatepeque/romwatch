@@ -47,15 +47,68 @@ flexion), and says so throughout.
 
 **Calibration.** Before any maneuver, the user holds a hand up naturally in front of the
 camera. Once MediaPipe's Hand Landmarker detects a stable hand for about half a second, the
-app records the hand's bounding-box width in pixels as a personal reference size, used to
-normalize distance measurements and to judge camera distance for the rest of the session.
+app records the diagonal of the box around all 21 landmarks, in pixels, as a personal
+reference size, used to judge camera distance for the rest of the session. An earlier
+version recorded bounding-box *width* instead, which is a measure of how the hand is turned
+as much as of how big it is: turning the hand edge-on collapses its width toward nothing
+while the hand stays exactly where it was. Since the thumb maneuver requires turning the
+hand, the reference size stopped matching the hand partway through every correct attempt.
+The diagonal barely moves under rotation.
 
-**Framing.** Camera position is checked continuously, but only to catch cases where a
-measurement would be unreliable: no hand visible, the hand too small or too large relative
-to the calibrated reference, or the wrist near the edge of the frame. The tolerance bands
-are wide on purpose. There is no single correct distance or angle to sit at a webcam, so the
-check only flags the extremes and confirms out loud ("Good, you're all set") once the
-current position is workable, rather than asking for one exact setup.
+**Framing.** Camera position is checked continuously, but only to catch cases where the
+measurement itself would be unreliable: no hand visible, part of the hand outside the frame
+(landmarks placed off-screen are extrapolations, not observations), or a hand so small or so
+large in frame that landmark placement degrades. It is explicitly not a pose check. Angle is
+free, because the measurements below are built to not care about it, and position in frame
+is free as long as the whole hand is inside it: an earlier version asked for the wrist to
+stay 10% clear of every edge, which flagged the very natural habit of resting the wrist low
+in frame while missing fingers actually clipped off the top. During capture, frames that
+fail framing are excluded from scoring rather than merely counted against the attempt's
+quality, since each repetition keeps its most extreme frame and a clipped hand can produce
+an extreme-looking reading out of landmarks the model was guessing at.
+
+**Showing the measurement.** While a maneuver is being performed, the number being scored is
+on screen in plain language, alongside the threshold it has to clear ("thumb tip sits 38% of a
+palm length out from the wrist; the line is at 10%"), and for the thumb maneuver the
+decision boundary itself is drawn on the camera overlay as a dashed line across the wrist,
+generated from the same function that scores the rep. The recorded value is shown again next
+to each result. Any other hand in view is drawn faintly alongside it, so
+the choice of which hand is being measured is visible rather than assumed. This is a debuggability feature before it is a UI feature: the failure this
+app is most prone to is disagreeing with someone about their own body, and "it said no" is
+not a report anyone can act on, while "it said 38% while my thumb was flat against my wrist,
+and the dashed line was up near my knuckles" localizes the fault immediately.
+
+**What counts as a measurable frame.** Not every frame containing a hand can be scored, and
+the cases where it can't are specific enough to name. Calibration won't lock a reference
+while two hands are in view: that is the moment the session decides which hand it measures,
+the model's ordering between two detections is arbitrary, and picking the assisting hand
+there would mean measuring the wrong hand for the rest of the session with nothing on screen
+looking wrong. During a maneuver, a frame is dropped if the tracked hand isn't found, isn't
+fully in frame, is too small or large, or fails a check belonging to that specific maneuver:
+
+- *Thumb, hand pointing at the camera.* The reach is a ratio along the hand's axis, and it
+  is genuinely invariant to the hand being turned, right up until the axis is pointing at
+  the lens and its projection collapses. The ratio stays correct; the arithmetic doesn't. At
+  a tenth of the flat-on axis length, 0.6% of landmark jitter moves the reading by 0.3 of a
+  palm length, three times the width of the whole threshold, and since the repetition keeps
+  its lowest frame, one such frame decides it. Frames whose palm length falls below 0.15 of
+  the hand's overall span are dropped with "turn your hand more side-on."
+- *Little finger, curled rather than pushed.* The extension angle is unsigned: it measures
+  how far the joint bent, not whether it bent back toward the dorsum, which is the direction
+  that means hypermobility. A finger curled into the palm measures 79 degrees and a hard
+  fist 105, both past a 70-degree threshold that is supposed to mean hyperextension. Under
+  passive administration this is not a hypothetical: the maneuver is performed by gripping
+  the little finger and pushing it back, and gripping curls fingers, so the wrong-direction
+  pose occurs during nearly every attempt. The two are separated at the finger's own PIP
+  joint rather than by the direction of the bend, which in 2D is recoverable only from the
+  palm's facing and degenerates in exactly the side-on view this maneuver asks for. Being
+  pushed back leaves the finger straight along its length; curling doesn't.
+
+A repetition tolerates 35% of its frames being dropped before it is discarded and retried.
+That budget was 15% when a second hand in frame was not expected. It has to be generous now
+for the same reason the tracking rules do: the hand doing the pushing spends much of the
+attempt on top of the joint being measured, so losing frames is the normal case rather than
+evidence of a bad attempt.
 
 **Guidance.** An earlier version overlaid an animated ghost skeleton on the live camera feed
 as a moving target to match. In practice it did the opposite of its job: a second
@@ -67,23 +120,42 @@ instructions, which stay on screen for the whole maneuver instead of being overw
 live tracking feedback. The photo shows what the target position looks like; it plays no
 role in scoring.
 
-**Tracking two hands, not one.** Nearly every Beighton maneuver is normally administered by
-a second person passively pushing the joint into position; romwatch asks the person to do
-that with their own other hand instead. An earlier version tracked only one hand, which
-meant the assisting hand entering frame could hijack tracking outright or cause it to
-flicker between the two hands frame to frame, corrupting the reading. It now tracks up to
-two hands and keeps following whichever one's wrist stays closest to where the tracked hand
-was a moment ago, so the assisting hand entering the frame doesn't take over.
+**Tracking two hands, not one.** Both maneuvers romwatch measures are passive tests. In the
+clinic the examiner pushes the joint into position; the question the test asks is what range
+the joint has when something else moves it, not what the person can reach unaided. Someone
+with hEDS reaching thumb to forearm with their other hand pushing is not compensating for a
+failure to do it alone, that is the test being administered correctly. romwatch substitutes
+the person's own other hand for the clinician's, which makes two hands in frame the normal
+operating condition of the app rather than an edge case to tolerate.
 
-**Measurement.** For the thumb-to-forearm maneuver, the distance from the thumb-tip
-landmark to the wrist is measured and normalized by hand size. An earlier version tried to
-approximate the forearm's direction (there's no elbow landmark on a hand-only model) as a
-ray from the wrist, and measured distance to that ray instead of straight to the wrist. That
-depended on the hand's 2D direction in frame correctly indicating where the forearm was, and
-broke down for exactly the reason a real attempt tends to break it: a genuine full
-thumb-to-forearm touch naturally rotates the wrist away from wherever it started, taking the
-assumed ray with it. Plain distance to the wrist is angle-independent, since the wrist is an
-actually-tracked point rather than an inferred direction. For the little-finger maneuver,
+An early version tracked only one hand, so the assisting hand could hijack tracking outright
+or flicker between the two frame to frame. Tracking then moved to up to two hands, following
+whichever wrist stayed closest to where the tracked hand was a moment ago. That held while
+both hands were visible and failed at the one moment that decides the result: at full
+apposition the assisting hand covers the hand it is pushing, the model frequently reports
+only the assisting hand, and "closest to where we were looking" then resolves to the wrong
+hand entirely, scoring the helper's pose as the person's range of motion. Tracking is now
+keyed to the handedness label of the hand calibrated at the start of the session. Proximity
+only breaks ties between two detections of the same handedness, and if the tracked hand is
+not among the detections at all, the frame is reported as untracked rather than measured on
+whatever else is in view. The cost is a retry; the alternative was a confident wrong number.
+
+**Measurement.** For the thumb-to-forearm maneuver, the thumb tip's position is projected
+onto the hand's own axis (wrist to middle knuckle) and normalized by hand size, giving a
+signed reach: positive while the tip is still out over the palm, zero at the wrist line,
+negative once it has crossed onto the forearm. Two earlier versions measured plain distance
+instead, first to an approximated forearm ray and then straight to the wrist landmark, and
+both scored genuine hypermobile hands negative. The ray version depended on the hand's 2D
+direction in frame correctly indicating where the forearm was, and broke down for exactly
+the reason a real attempt tends to break it: a genuine full thumb-to-forearm touch rotates
+the wrist away from wherever it started, taking the assumed ray with it. Distance to the
+wrist landmark removed that assumption but measured the wrong quantity, because the thumb
+reaches the forearm on the radial side and a few centimetres proximal to the wrist landmark:
+a real touch still reads as a sizeable distance, while a threshold loose enough to accept it
+also accepts an ordinary thumb folded across the palm. The two cases barely differ in
+distance to the wrist and differ completely in whether the tip has crossed the wrist line,
+which is what the clinical criterion is asking about; the sideways offset that defeated the
+distance metric falls into the discarded perpendicular component. For the little-finger maneuver,
 the angle between the wrist-to-pinky-knuckle vector and the pinky's proximal phalanx is
 measured: how far the finger has folded back relative to the hand's own orientation, rather
 than relative to the camera frame. Both measurements are now rotation-independent for the
@@ -130,7 +202,8 @@ and because a portfolio piece that only shows the polished current state hides h
 there.
 
 The first working version scored that same test session as within the typical range on
-both maneuvers. Three concrete problems came out of digging into why:
+both maneuvers, and the version after it still did. Four concrete problems came out of
+digging into why:
 
 1. **Tracking broke when the assisting hand entered frame.** Most Beighton items, including
    both of the ones romwatch measures, are normally administered with a second person's hand
@@ -142,16 +215,24 @@ both maneuvers. Three concrete problems came out of digging into why:
 2. **The thumb measurement assumed a hand direction that a real attempt rotates away from.**
    The forearm-ray approximation depended on the hand's 2D direction in frame, which a
    genuine full thumb-to-forearm motion naturally changes as the wrist turns. Fixed by
-   measuring straight-line distance to the wrist instead, which doesn't depend on hand
-   direction at all (see Measurement above).
+   measuring along the hand's own axis instead, which doesn't depend on hand direction at
+   all (see Measurement above).
 3. **Three repetitions asked too much.** Three attempts per maneuver, needing two positive
    to count, was tiring to perform and not obviously better than accepting a single clean
    demonstration, which is what the clinical exam itself does. Fixed by dropping to one
    attempt, with a second only if the first wasn't a clean positive (see Scoring above).
 
+4. **A thumb visibly touching the wrist still scored negative.** Reported by a tester with
+   diagnosed hEDS. Distance from the thumb tip to the wrist landmark stays large even at
+   full contact, because contact happens off to the radial side and past the landmark, so
+   no threshold on that distance separates a hypermobile thumb from an ordinary one folded
+   across the palm. Fixed by measuring signed reach along the hand's axis, which asks
+   whether the tip crossed the wrist line rather than how far it sits from a point (see
+   Measurement above).
+
 What this single session doesn't establish: whether the fixed version reads correctly across
 different people, hand sizes, skin tones, lighting conditions, or camera setups. One person
-finding and describing three specific failure modes is enough to fix those three failure
+finding and describing four specific failure modes is enough to fix those four failure
 modes; it is not evidence the tool is now accurate in general, and the limitations below
 still apply in full.
 
@@ -164,9 +245,10 @@ still apply in full.
   as a goniometer or a depth camera. Landmark depth estimates from a monocular model are
   the least reliable dimension, consistent with what the related-work studies above report.
 - **No forearm tracking.** The hand-only model has no elbow landmark, so the thumb-to-forearm
-  measurement uses distance to the wrist as a stand-in for "touching the forearm." That's
-  deliberately the more robust choice given no forearm is actually tracked (see Measurement
-  above), but it is still a stand-in, not a measurement of the forearm itself.
+  measurement uses "the thumb tip has reached the wrist line" as a stand-in for "touching
+  the forearm." That's deliberately the more robust choice given no forearm is actually
+  tracked (see Measurement above), but it is still a stand-in: it cannot tell a thumb
+  resting against the forearm from one held just short of it in the same plane.
 - **The assisting hand can occlude the joint being measured.** Tracking now follows the
   correct hand instead of flickering between the two (see Tracking above), but if the
   assisting hand physically covers the joint being pushed, the landmark model simply can't
@@ -177,6 +259,11 @@ still apply in full.
   other hand. Whether that changes the reading compared to a passive push (more force from
   someone else, less proprioceptive feedback, a different resting starting point) hasn't
   been tested against a real clinician doing it both ways on the same person.
+- **The little finger's direction of bend is inferred, not seen.** A single 2D camera can't
+  reliably tell a joint bending toward the dorsum from one bending toward the palm. romwatch
+  infers it from whether the finger stayed straight along its own length, which separates
+  being pushed back from being curled, but would not separate hyperextension from a finger
+  bent back by something other than the maneuver.
 - **The little-finger angle is a proxy, not the clinical reference frame.** The real test
   measures dorsiflexion relative to the dorsum of the hand, usually with a second person
   passively pushing the finger back. romwatch measures the angle at the joint relative to
@@ -217,6 +304,15 @@ still apply in full.
   is not something that should change anyone's behavior on the strength of one reading.
 - The framing tolerance is deliberately wide, on the reasoning that a measurement that only
   works from one exact camera position is not a measurement that will get used consistently.
+  The corollary is that the measurements have to earn that tolerance rather than the framing
+  check enforcing it: both are ratios between tracked landmarks, computed after undoing the
+  frame's aspect ratio, so a hand held at an odd angle reads the same as one held square to
+  the camera instead of merely being rejected as badly framed.
+- Every threshold the app applies is visible on screen as it is applied, live and in plain
+  language, on the reasoning that a screening tool telling someone something surprising about
+  their own body should be arguable rather than authoritative. It also makes the app
+  reportable: the failure modes found in testing so far were all found by someone able to say
+  what the screen said at the moment it was wrong.
 - What this design cannot fix: the fundamental gap between a single 2D camera and a
   clinician's hands-on exam. No amount of retry logic recovers a dimension the camera never
   captured.

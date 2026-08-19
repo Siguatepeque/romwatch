@@ -45,3 +45,19 @@ export function drawCountdown(ctx, canvasWidth, canvasHeight, value) {
   ctx.fillText(String(value), canvasWidth / 2, canvasHeight / 2);
   ctx.restore();
 }
+
+// Draws the pass/fail boundary a maneuver is judged against, straight from
+// the geometry that judges it. Dashed and dimmer than the skeleton, so it
+// reads as a reference mark rather than as part of the hand.
+export function drawThresholdLine(ctx, [a, b], canvasWidth, canvasHeight, style = {}) {
+  const { color = "#f5c26b", lineWidth = 2 } = style;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth;
+  ctx.setLineDash([8, 7]);
+  ctx.beginPath();
+  ctx.moveTo(a.x * canvasWidth, a.y * canvasHeight);
+  ctx.lineTo(b.x * canvasWidth, b.y * canvasHeight);
+  ctx.stroke();
+  ctx.restore();
+}

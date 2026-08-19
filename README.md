@@ -18,7 +18,8 @@ in your browser.**
 </div>
 
 romwatch watches your hand through your webcam and guides you through two short movements:
-bending your thumb toward your forearm, and bending your little finger back. Both are real
+bending your thumb toward your forearm, and bending your little finger back, both with your
+other hand doing the pushing the way a clinician would. Both are real
 clinical tests, the two upper-limb items of the **Beighton score**, the standard nine-point
 exam clinicians use to screen for generalized joint hypermobility.
 
@@ -69,26 +70,45 @@ an invented substitute test.
 
 ## How it works
 
-1. **Calibrate.** Hold your hand up naturally so the app can learn your hand's size at a
-   comfortable distance. This becomes the reference for the framing checks that follow.
+1. **Calibrate.** Hold up the hand you want tested, on its own, so the app can learn its
+   size at a comfortable distance and know which of your two hands it's measuring. It won't
+   start while both hands are in view, since it would have to guess between them. This
+   becomes the reference for the framing checks that follow.
 2. **Get framed.** Before each movement, the app checks that your hand is visible, not too
-   close, not too far, and not clipped at the edge of the frame. The tolerance is wide on
-   purpose: there's no single correct way to sit at a webcam, so it only flags the cases
-   where a measurement would actually be unreliable, and says "Good, you're all set" the
-   moment your current position works.
+   close, not too far, and not clipped at the edge of the frame. It does not check the
+   angle you hold your hand at, because the measurements don't depend on one: they're
+   ratios between tracked landmarks, so a hand turned sideways or tipped toward the camera
+   reads the same as one held square to it. Position in frame is free too, as long as the
+   whole hand is inside it. The check only flags the cases where a reading would actually
+   be unreliable, and says "Good, you're all set" the moment your position works.
 3. **See what you're aiming for.** A real reference photo of the completed maneuver is
    shown next to the instructions, which stay on screen for the whole movement rather than
    being overwritten by live tracking feedback. An earlier version overlaid an animated
    ghost hand on the camera feed as a moving target; in practice a second hand-shaped
    outline on top of your own tracked hand read as confusing, not helpful, so it was
    removed in favor of the photo and the plain live skeleton.
-4. **Hold.** Each movement gets one attempt, and a second only if the first wasn't a clean
-   positive, since most people testing this are exactly the people three or four repeat
-   attempts is most tiring for. A repetition with poor tracking is discarded and retried
-   rather than scored, since a bad reading is worse than no reading, and using your other
-   hand to help push the joint into position is expected, most of these maneuvers are
-   normally administered that way by a clinician in the first place.
-5. **Read the result.** A single successful attempt is enough to score a maneuver positive
+4. **Hold.** Use your other hand to push the joint into position. Both of these are passive
+   tests: in the clinic the examiner does the pushing, and what's being measured is the
+   range the joint has when something else moves it, not what you can reach unaided. Two
+   hands in frame is the expected state, and the app keeps measuring the hand you
+   calibrated with rather than the one doing the pushing, even when they overlap. Each
+   movement gets one attempt, and a second only if the first wasn't a clean positive, since
+   the people most likely to be using this are exactly the people three or four repeat
+   attempts are most tiring for. A repetition with poor tracking is discarded and retried
+   rather than scored, since a bad reading is worse than no reading. Individual frames get
+   dropped the same way and for the same reason: a hand turned to point straight at the
+   camera makes the thumb reading numerically unstable, and a little finger that's curled
+   rather than pushed back reads like hyperextension to a camera that can only see the size
+   of the bend, not its direction. When frames are being dropped, the app says which of
+   these it is.
+5. **Watch the number, not just the verdict.** While you're holding the position, the app
+   shows what it's currently measuring in plain language, along with the threshold that
+   measurement has to clear ("thumb tip sits 38% of a palm length out from the wrist;
+   the line is at 10%"), and draws the thumb test's pass/fail line right on the camera view.
+   The recorded number shows up again next to each result. If the app ever disagrees with
+   what you can plainly see your own hand doing, that's the number to quote when you
+   report it.
+6. **Read the result.** A single successful attempt is enough to score a maneuver positive
    for that session, matching how the real exam scores it. The recommendation only
    escalates to "worth mentioning to a doctor" once a maneuver has come back positive
    across three or more separate sessions, not from a single reading.

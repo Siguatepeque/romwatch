@@ -6,8 +6,16 @@ import {
   MIDDLE_MCP,
   PINKY_MCP,
   PINKY_PIP,
-  normalizedThumbForearmDistance,
+  PINKY_DIP,
+  normalizedThumbForearmReach,
   pinkyExtensionAngleDeg,
+  squareAspect,
+  thumbPoseIssue,
+  pinkyPoseIssue,
+  thumbTargetLine,
+  describeThumbReach,
+  describePinkyAngle,
+  THUMB_PAST_WRIST_NORMALIZED,
   checkFraming,
   pickPrimaryHand,
   isThumbRepPositive,
@@ -36,29 +44,36 @@ function makeHand() {
   return landmarks;
 }
 
-test("normalizedThumbForearmDistance: thumb far from the wrist is large", () => {
+test("normalizedThumbForearmReach: an ordinary thumb folded across the palm stays positive", () => {
   const hand = makeHand();
-  const d = normalizedThumbForearmDistance(hand);
-  assert.ok(d > 0.5, `expected a large distance, got ${d}`);
+  assert.ok(isThumbRepPositive(normalizedThumbForearmReach(hand)) === false);
 });
 
-test("normalizedThumbForearmDistance: thumb tip right at the wrist is ~0", () => {
+// The real-world false negative this metric exists to fix: the thumb tip is
+// touching the forearm, which puts it a little past the wrist line and well
+// off to the radial side. Its plain distance to the wrist landmark is large
+// (0.4 hand-scales here), so the old distance metric scored this negative.
+test("normalizedThumbForearmReach: thumb touching the forearm scores positive despite the sideways offset", () => {
   const hand = makeHand();
-  hand[THUMB_TIP] = { x: 0.51, y: 0.81, z: 0 };
-  const d = normalizedThumbForearmDistance(hand);
-  assert.ok(d < 0.05, `expected ~0, got ${d}`);
+  hand[THUMB_TIP] = { x: 0.3, y: 0.85, z: 0 }; // past the wrist, radial side
+  const reach = normalizedThumbForearmReach(hand);
+  assert.ok(reach < 0, `expected the tip past the wrist line, got ${reach}`);
+  assert.ok(isThumbRepPositive(reach));
 });
 
-test("normalizedThumbForearmDistance: doesn't depend on which way the hand is rotated", () => {
-  // Same thumb-near-wrist distance, but the rest of the hand (via middle MCP)
-  // points in a completely different direction. The old ray-based version
-  // would have measured this differently depending on hand rotation; the
-  // wrist-distance version shouldn't care.
+test("normalizedThumbForearmReach: thumb tip right at the wrist is ~0", () => {
   const hand = makeHand();
-  hand[MIDDLE_MCP] = { x: 0.9, y: 0.9, z: 0 }; // hand rotated off to the side
   hand[THUMB_TIP] = { x: 0.51, y: 0.81, z: 0 };
-  const d = normalizedThumbForearmDistance(hand);
-  assert.ok(d < 0.05, `expected ~0 regardless of rotation, got ${d}`);
+  assert.ok(Math.abs(normalizedThumbForearmReach(hand)) < 0.05);
+});
+
+test("normalizedThumbForearmReach: doesn't depend on which way the hand is pointing", () => {
+  // Same hand, rotated 90 degrees about the wrist. Measuring along the hand's
+  // own axis rather than the camera frame, the reading shouldn't move.
+  const hand = makeHand();
+  const rotated = hand.map((p) => ({ x: 0.5 + (p.y - 0.8), y: 0.8 - (p.x - 0.5), z: 0 }));
+  const delta = normalizedThumbForearmReach(rotated) - normalizedThumbForearmReach(hand);
+  assert.ok(Math.abs(delta) < 1e-9, `rotation changed the reading by ${delta}`);
 });
 
 test("pinkyExtensionAngleDeg: finger held straight in line with the hand reads ~0 degrees", () => {
@@ -82,64 +97,185 @@ test("pinkyExtensionAngleDeg: finger folded back over the hand reads ~180 degree
   assert.ok(Math.abs(pinkyExtensionAngleDeg(hand) - 180) < 1);
 });
 
+// The little finger's extension angle can't tell which way the joint bent, so
+// a curled finger reads as a large "extension." That pose isn't hypothetical
+// here: this maneuver is performed by gripping the finger and pushing it, and
+// gripping curls fingers.
+test("pinkyPoseIssue: a curled little finger is not measurable as extension", () => {
+  const hand = makeHand();
+  hand[PINKY_MCP] = { x: 0.62, y: 0.62, z: 0 };
+  hand[PINKY_PIP] = { x: 0.6, y: 0.6, z: 0 };
+  hand[PINKY_DIP] = { x: 0.58, y: 0.62, z: 0 }; // doubling back: a curl
+  assert.ok(isPinkyRepPositive(pinkyExtensionAngleDeg(hand)), "the angle alone reads as a positive");
+  assert.equal(pinkyPoseIssue(hand), "finger_curled");
+});
+
+test("pinkyPoseIssue: a finger pushed straight back is measurable", () => {
+  const hand = makeHand();
+  hand[PINKY_MCP] = { x: 0.62, y: 0.62, z: 0 };
+  hand[PINKY_PIP] = { x: 0.56, y: 0.71, z: 0 };
+  hand[PINKY_DIP] = { x: 0.5, y: 0.8, z: 0 }; // straight along the finger
+  assert.ok(isPinkyRepPositive(pinkyExtensionAngleDeg(hand)));
+  assert.equal(pinkyPoseIssue(hand), null);
+});
+
+test("thumbPoseIssue: a hand across the camera is measurable, one pointing at it isn't", () => {
+  const hand = makeHand();
+  assert.equal(thumbPoseIssue(hand), null);
+
+  // Same hand foreshortened along its own axis, as when it turns to point at
+  // the camera. The reach stays the same number, but it's now a ratio of two
+  // tiny projections and one frame of jitter swings it past the threshold.
+  const wristY = hand[WRIST].y;
+  const endOn = hand.map((p) => ({ x: p.x, y: wristY + (p.y - wristY) * 0.1, z: 0 }));
+  assert.ok(
+    Math.abs(normalizedThumbForearmReach(endOn) - normalizedThumbForearmReach(hand)) < 1e-9,
+    "the reach itself is unchanged, which is exactly why it needs a separate guard"
+  );
+  assert.equal(thumbPoseIssue(endOn), "hand_end_on");
+});
+
 test("checkFraming: no landmarks is not_detected", () => {
   assert.equal(checkFraming(null, 1000, 200), "not_detected");
 });
 
-test("checkFraming: wrist near the frame edge is off_center", () => {
+// Hand span (bounding-box diagonal) for makeHand is hypot(0.2, 0.3) = 0.36.
+test("checkFraming: a hand resting low in frame is fine, not a framing error", () => {
   const hand = makeHand();
-  hand[WRIST] = { x: 0.05, y: 0.5, z: 0 };
-  assert.equal(checkFraming(hand, 1000, 200), "off_center");
+  hand[WRIST] = { x: 0.5, y: 0.95, z: 0 }; // near the bottom edge but still visible
+  assert.equal(checkFraming(hand, 1000, 360), "ok");
+});
+
+test("checkFraming: a landmark actually outside the frame is clipped", () => {
+  const hand = makeHand();
+  hand[THUMB_TIP] = { x: -0.02, y: 0.6, z: 0 };
+  assert.equal(checkFraming(hand, 1000, 360), "clipped");
 });
 
 test("checkFraming: hand much smaller than reference is too_far", () => {
   const hand = makeHand();
-  // widthPx = 0.2 * 1000 = 200, well under 0.4 * 2000 = 800
+  // spanPx = 0.36 * 1000 = 360, well under 0.35 * 2000 = 700
   assert.equal(checkFraming(hand, 1000, 2000), "too_far");
 });
 
 test("checkFraming: hand much larger than reference is too_close", () => {
   const hand = makeHand();
-  // widthPx = 200, well over 2.2 * 50 = 110
+  // spanPx = 360, well over 2.5 * 50 = 125
   assert.equal(checkFraming(hand, 1000, 50), "too_close");
 });
 
 test("checkFraming: hand within tolerance is ok", () => {
   const hand = makeHand();
-  // widthPx = 200, refHandWidthPx = 200: right in the middle of the tolerance band
-  assert.equal(checkFraming(hand, 1000, 200), "ok");
+  assert.equal(checkFraming(hand, 1000, 360), "ok");
 });
+
+// The framing gate must not double as a pose gate: turning the hand edge-on
+// shrinks its bounding box in one axis, which the old width-based size check
+// read as "you moved too far away" in the middle of a correct attempt.
+test("checkFraming: a hand turned edge-on to the camera is still ok", () => {
+  const hand = makeHand();
+  const flattened = hand.map((p) => ({ x: 0.5 + (p.x - 0.5) * 0.15, y: p.y, z: 0 }));
+  assert.equal(checkFraming(flattened, 1000, 360), "ok");
+});
+
+test("squareAspect: measurements survive a non-square frame", () => {
+  // The same hand seen on a 16:9 frame: normalized y units cover less real
+  // distance than x units, which skews any angle-dependent measurement unless
+  // it's undone first.
+  const hand = makeHand();
+  hand[THUMB_TIP] = { x: 0.34, y: 0.74, z: 0 }; // off-axis, so skew would show
+  const aspect = 16 / 9;
+  const square = normalizedThumbForearmReach(squareAspect(hand, 1));
+  const widescreen = normalizedThumbForearmReach(squareAspect(hand, aspect));
+  assert.ok(Math.abs(square - widescreen) < 1e-9, `aspect skewed the reading: ${square} vs ${widescreen}`);
+});
+
+test("thumbTargetLine: the drawn line is exactly the pass/fail boundary", () => {
+  const hand = makeHand();
+  const aspect = 16 / 9;
+  const [a, b] = thumbTargetLine(hand, aspect);
+  for (const t of [0, 0.37, 1]) {
+    hand[THUMB_TIP] = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: 0 };
+    const reach = normalizedThumbForearmReach(squareAspect(hand, aspect));
+    assert.ok(
+      Math.abs(reach - THUMB_PAST_WRIST_NORMALIZED) < 1e-9,
+      `a thumb tip on the drawn line should read exactly at the threshold, got ${reach}`
+    );
+  }
+});
+
+test("describe*: the reading says the number and the bar it has to clear", () => {
+  const short = describeThumbReach(0.38);
+  assert.equal(short.met, false);
+  assert.match(short.detail, /38%/);
+  assert.match(short.detail, /10%/);
+  assert.equal(describeThumbReach(-0.04).met, true);
+
+  const pinky = describePinkyAngle(54);
+  assert.equal(pinky.met, false);
+  assert.match(pinky.detail, /54/);
+  assert.equal(describePinkyAngle(88).met, true);
+});
+
+// Two hands in frame is the normal state for these maneuvers, since both are
+// administered by pushing the joint with the other hand.
+function detect(...hands) {
+  return hands.map(([landmarks, label]) => ({ landmarks, label }));
+}
 
 test("pickPrimaryHand: no hands detected returns null", () => {
-  assert.equal(pickPrimaryHand([], { x: 0.5, y: 0.5 }), null);
-  assert.equal(pickPrimaryHand(null, { x: 0.5, y: 0.5 }), null);
+  assert.equal(pickPrimaryHand([], { label: "Right", wrist: { x: 0.5, y: 0.5 } }), null);
+  assert.equal(pickPrimaryHand(null, { label: "Right", wrist: { x: 0.5, y: 0.5 } }), null);
 });
 
-test("pickPrimaryHand: a single detected hand is returned regardless of prior position", () => {
+test("pickPrimaryHand: before calibration locks a hand in, the first detection is it", () => {
   const hand = makeHand();
-  assert.equal(pickPrimaryHand([hand], { x: 0, y: 0 }), hand);
+  const picked = pickPrimaryHand(detect([hand, "Left"]), { label: null, wrist: null });
+  assert.equal(picked.landmarks, hand);
 });
 
-test("pickPrimaryHand: no prior position defaults to the first detected hand", () => {
-  const handA = makeHand();
-  const handB = makeHand();
-  handB[WRIST] = { x: 0.1, y: 0.1, z: 0 };
-  assert.equal(pickPrimaryHand([handA, handB], null), handA);
-});
-
-test("pickPrimaryHand: sticks with whichever hand is closest to the last known position", () => {
+test("pickPrimaryHand: the assisting hand doesn't hijack tracking", () => {
   const testHand = makeHand(); // wrist at (0.5, 0.8)
-  const assistingHand = makeHand();
-  assistingHand[WRIST] = { x: 0.05, y: 0.05, z: 0 }; // entering from a corner
-  // Even listed first, the assisting hand shouldn't hijack tracking from the
-  // hand that was actually being measured a moment ago.
-  const picked = pickPrimaryHand([assistingHand, testHand], { x: 0.5, y: 0.8 });
-  assert.equal(picked, testHand);
+  const assisting = makeHand();
+  assisting[WRIST] = { x: 0.05, y: 0.05, z: 0 };
+  // Listed first, and it's the same handedness as the tracked hand here, so
+  // only position separates them.
+  const picked = pickPrimaryHand(detect([assisting, "Right"], [testHand, "Right"]), {
+    label: "Right",
+    wrist: { x: 0.5, y: 0.8 },
+  });
+  assert.equal(picked.landmarks, testHand);
+});
+
+// The failure this guards against happens at the exact moment that matters:
+// at full apposition the assisting hand covers the hand it's pushing, so the
+// model often reports only the assisting hand. Measuring it would mean
+// scoring a stranger's pose as this person's range of motion.
+test("pickPrimaryHand: the assisting hand alone in view is not measured", () => {
+  const assisting = makeHand();
+  assisting[WRIST] = { x: 0.52, y: 0.79, z: 0 }; // right next to where the tracked hand was
+  const picked = pickPrimaryHand(detect([assisting, "Left"]), {
+    label: "Right",
+    wrist: { x: 0.5, y: 0.8 },
+  });
+  assert.equal(picked, null);
+});
+
+test("pickPrimaryHand: handedness outranks being closer to the last known position", () => {
+  const testHand = makeHand();
+  testHand[WRIST] = { x: 0.7, y: 0.75, z: 0 }; // drifted away
+  const assisting = makeHand();
+  assisting[WRIST] = { x: 0.5, y: 0.8, z: 0 }; // exactly where we last looked
+  const picked = pickPrimaryHand(detect([assisting, "Left"], [testHand, "Right"]), {
+    label: "Right",
+    wrist: { x: 0.5, y: 0.8 },
+  });
+  assert.equal(picked.landmarks, testHand);
 });
 
 test("thumb/pinky positivity thresholds are inclusive at the boundary", () => {
-  assert.equal(isThumbRepPositive(0.15), true);
-  assert.equal(isThumbRepPositive(0.150001), false);
+  assert.equal(isThumbRepPositive(0.1), true);
+  assert.equal(isThumbRepPositive(0.100001), false);
   assert.equal(isPinkyRepPositive(70), true);
   assert.equal(isPinkyRepPositive(69.999), false);
 });
