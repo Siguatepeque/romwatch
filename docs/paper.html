@@ -639,8 +639,8 @@
     <p>
       None of the papers found target the Beighton thumb-to-forearm or little-finger
       maneuvers specifically, and none build a repeated-session consistency layer on top of a
-      single reading. That combination is what romwatch adds, a modest difference worth
-      stating plainly rather than overselling.
+      single reading. That combination is what romwatch adds, which is a
+      modest difference.
     </p>
   </section>
 
@@ -718,7 +718,7 @@
       <li><strong>Two of nine.</strong> romwatch measures two of the nine Beighton items and cannot produce a full Beighton score. It says so, rather than implying the two it covers stand in for the whole exam.</li>
       <li><strong>No depth sensor.</strong> A single 2D camera can't recover true 3D joint angles as precisely as a goniometer or a depth camera. Landmark depth estimates from a monocular model are the least reliable dimension.</li>
       <li><strong>No forearm tracking.</strong> The hand-only model has no elbow landmark, so the thumb-to-forearm measurement uses "the thumb tip reached the wrist line" as a stand-in for "touching the forearm." It can't tell a thumb resting against the forearm from one held just short of it in the same plane.</li>
-      <li><strong>The assisting hand can occlude the joint being measured.</strong> Tracking now follows the correct hand, but if the assisting hand physically covers the joint being pushed, the landmark model simply can't see what it can't see. That's a hard limit of a single camera, not a bug to patch.</li>
+      <li><strong>The assisting hand can occlude the joint being measured.</strong> Tracking now follows the correct hand, but if the assisting hand physically covers the joint being pushed, the landmark model simply can't see what it can't see. One camera can't see through a hand, and I don't have a way around that.</li>
       <li><strong>Self-administered, not passively administered.</strong> The clinical exam has a second person push the joint into position; romwatch has the person push their own joint with their own other hand. Whether that changes the reading hasn't been tested against a clinician doing it both ways on the same person.</li>
       <li><strong>The little finger's direction of bend is inferred, not seen.</strong> A single 2D camera can't reliably tell a joint bending toward the dorsum from one bending toward the palm. romwatch infers it from whether the finger stayed straight along its own length, which separates being pushed back from being curled, but wouldn't separate hyperextension from a finger bent back by something other than the maneuver.</li>
       <li><strong>The little-finger angle is a proxy, not the clinical reference frame.</strong> The real test measures dorsiflexion relative to the dorsum of the hand. romwatch measures the joint angle relative to the hand's own metacarpal direction instead. The two move together, but the numbers aren't interchangeable.</li>
