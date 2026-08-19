@@ -5,10 +5,13 @@
 **A camera-based hypermobility screener for two real Beighton score tests, running entirely
 in your browser.**
 
+[![Live demo](https://img.shields.io/badge/live%20demo-online-2f6f66)](https://siguatepeque.github.io/romwatch/)
+[![Methods and findings](https://img.shields.io/badge/methods-%26%20findings-2f6f66)](https://siguatepeque.github.io/romwatch/docs/paper.html)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2f6f66)](LICENSE)
 ![No frontend dependencies](https://img.shields.io/badge/frontend-zero%20dependencies-2f6f66)
 ![Tests](https://img.shields.io/badge/tests-node%20%2B%20playwright-2f6f66)
 
+[Try it](https://siguatepeque.github.io/romwatch/) •
 [Why this exists](#why-these-tests) •
 [How it works](#how-it-works) •
 [Quick start](#quick-start) •
@@ -30,8 +33,7 @@ Nothing is uploaded. Session history lives in your browser's local storage, nowh
 > **This is a screening aid, not a diagnosis.** It is not a medical device and does not
 > replace a clinician. If it flags something, the right next step is a conversation with a
 > doctor, not a conclusion drawn from a webcam. See the
-> [methods and findings page](docs/paper.html) (plain-text version in [PAPER.md](PAPER.md))
-> for the full methodology, the clinical sources it draws from, real-world testing findings,
+> [methods and findings page](https://siguatepeque.github.io/romwatch/docs/paper.html) for the full methodology, the clinical sources it draws from, real-world testing findings,
 > and an honest account of what it can and cannot measure.
 
 ## Screenshots
@@ -159,8 +161,7 @@ knee hyperextension, trunk flexion), which need different joints and in some cas
 full-body pose model to reach. It tracks one hand per session. There's no account system
 or cross-device sync; history lives in that browser's local storage only.
 
-See the [methods and findings page](docs/paper.html) (or [PAPER.md](PAPER.md) for the
-plain-text version) for the complete methodology, the clinical literature it's grounded in,
+See the [methods and findings page](https://siguatepeque.github.io/romwatch/docs/paper.html) for the complete methodology, the clinical literature it's grounded in,
 what real-world testing found, the full list of limitations, and how each was addressed in
 the design where it could be.
 
